@@ -1,0 +1,740 @@
+# jamp configuration.  You maintain this file; the code never edits it.
+# Everything the classifier keys off of lives here so you can tune without code changes.
+
+settings:
+  genre: Live
+  # An official release ships with its own genre (UMLive writes "Jam").
+  # Overwriting it is the same kind of loss as overwriting an official title,
+  # so by default we leave the genre alone on OFFICIAL folders only.
+  # Set to false to stamp `genre` above onto everything.
+  preserve_official_genre: true
+  # Append the venue and city to the SHOW FOLDER name only, after " - ":
+  #   gd1977-05-08.sbd.miller.flac16 - Barton Hall, Ithaca, NY
+  # Track filenames never carry it, and the pipeline compares and de-duplicates
+  # on the part before the separator, so adding or changing a venue can never
+  # turn one show into two.
+  #   venue_only - only when the venue itself is known (matches the ALBUM rule)
+  #   any_known  - city and state alone are enough
+  #   off        - folder names stay purely mechanical
+  folder_location: venue_only
+  folder_location_max: 60
+  # Where phase2 --quarantine-lossy puts MP3s that duplicate a lossless copy.
+  # A top-level folder inside the library, mirroring each file's original path,
+  # so you can review it and delete by hand.  It is never scanned as music.
+  review_folder: _etree_review
+  # Folders that are not live shows and are never scanned.  A bare name matches
+  # anywhere; a path matches that folder specifically.  These are scope
+  # decisions about one collection, so they belong in your own jamp.yaml in
+  # the user folder, not here: whatever you list there is added to this.
+  ignore_folders: []
+  # Renaming a folder can fail with "access is denied" for a second or two
+  # after phase 2 has written tags to every file in it: the search indexer and
+  # antivirus open what just changed and hold the directory.  Five attempts
+  # backing off from 0.15s covers about 2.3 seconds in total.  A real
+  # permission problem does not clear, and is raised unchanged.
+  rename_attempts: 5
+  rename_retry_delay: 0.15
+  # A show is only eligible for --commit (phase 2) at or above this date confidence.
+  min_date_confidence_commit: 70
+  # Below this, the folder is not even listed as a plan row; it goes to issues.
+  min_date_confidence_plan: 25
+  # Earliest plausible show date in the library.
+  earliest_show_date: 1960-01-01
+  # Phase 0 only reads tags from this many files per folder (0 = all).
+  phase0_tag_sample: 4
+  # Windows path length at which we flag rather than crash.
+  max_path_length: 260
+  # Classifier decision thresholds (see classify.py). Retune after Phase 0.
+  # When neither side reaches the score and margin above, and the folder names
+  # no official series and no store, treat it as unofficial rather than leaving
+  # it unclassified.  Only the naming scheme turns on this, and an official
+  # release always names a series or a store, so it is never reached for one.
+  unknown_defaults_to_unofficial: true
+  classify_min_score: 30
+  classify_min_margin: 15
+
+# How much each signal is worth to the OFFICIAL / UNOFFICIAL classifier.
+# Phase 0 prints the signal histogram so these can be retuned from real counts.
+classifier_weights:
+  official:
+    series_match: 35          # "Dave's Picks 16"
+    store_marker: 30          # nugs / livephish / bandcamp mentioned anywhere
+    # Complete, consistent tags say the person who assembled the folder was
+    # careful - not that a label made it.  Plenty of tapers tag meticulously.
+    # It was worth as much as naming a known official series, which let it
+    # carry a folder to OFFICIAL entirely on its own; it is still the largest
+    # signal that does not actually identify a release.
+    tags_complete_consistent: 22
+    # Spelling the band out says almost nothing: "My Morning Jacket 2023-11-03
+    # Fox Theatre [FLAC24]" is a store download and "My Morning Jacket - New
+    # Years Eve 2006" is a fan copy.  Roughly even in this library, so it earns
+    # very little.
+    full_band_name: 6
+    bracket_quality_token: 8  # [FLAC24], [V0]
+    # Absence of evidence, so weak: plenty of community copies ship without
+    # checksums, and artwork is not proof of anything.  Between them these two
+    # used to manufacture 14 points of "official" out of nothing positive.
+    no_etree_sidecars: 6
+    copyright_tag: 12         # "2011, Umphrey's McGee" - tapers do not set this
+    cover_art: 3
+    tags_absent: -25          # a store download always ships with tags
+    audience_evidence: -40    # official releases are board-sourced, so a named
+                              # mic or a matrix keyword argues hard against one,
+                              # however clean the tags are
+  unofficial:
+    torrent_marker_file: 40   # "Torrent downloaded from ..."
+    no_tags_at_all: 25        # taggable files carrying no tags whatsoever
+    ffp_or_st5: 22
+    info_lineage: 22          # info file with a Lineage/Taper/Source line
+    audience_evidence: 20     # the mirror of official.audience_evidence
+    compact_prefix_name: 20   # mmj2003-09-26 style
+    etree_source_id: 25       # .029088. - an etree catalogue number
+    tags_missing: 15
+    md5: 14
+    shn_present: 12
+    etree_track_names: 12     # d1t01
+    taper_tags: 20            # a VENUE or TAPER tag; no store writes those
+    source_token_in_name: 18  # "... sbd flac" - a label never names a product so
+    titles_are_filenames: 20  # TITLE is the filename repeated, not a song name
+    mic_token: 10
+
+# Starting confidence per date pattern, before corroboration and penalties.
+# unambiguous_bonus is added back when a pattern that could have been read more
+# than one way turns out to have only one valid reading (10-31-91).
+date_confidence:
+  iso_full: 90        # 2012-09-12, 2012_04_19
+  iso_compact: 80     # 20120912
+  iso_swapped: 45     # a repaired year-day-month typo: reported, never committed alone
+  us_full: 72         # 9-12-2012
+  us_short: 60        # 10-31-91, 5-28-11
+  six_digit: 58       # u111105, mmj231103
+  new_years_eve: 40   # "New Year's Eve 2006" - a suggestion, never committable
+  unambiguous_bonus: 12
+
+bands:
+  - abbrev: mmj
+    name: My Morning Jacket
+    prefixes: [mmj]
+    aliases: ["My Morning Jacket", "MMJ"]
+    active_years: [1998, 2030]
+  - abbrev: um
+    name: Umphrey's McGee
+    prefixes: [um, u]
+    aliases: ["Umphrey's McGee", "Umphreys McGee", "Umphrey s McGee", "UM"]
+    active_years: [1997, 2030]
+  - abbrev: gd
+    name: Grateful Dead
+    prefixes: [gd]
+    aliases: ["Grateful Dead", "The Grateful Dead"]
+    active_years: [1965, 1995]
+  - abbrev: ph
+    name: Phish
+    prefixes: [ph]
+    aliases: ["Phish"]
+    active_years: [1983, 2030]
+  - abbrev: wsp
+    name: Widespread Panic
+    prefixes: [wsp]
+    aliases: ["Widespread Panic"]
+    active_years: [1986, 2030]
+  - abbrev: abb
+    name: The Allman Brothers Band
+    prefixes: [abb]
+    aliases: ["The Allman Brothers Band", "Allman Brothers Band", "Allman Brothers"]
+    active_years: [1969, 2014]
+  - abbrev: dtb
+    name: The Derek Trucks Band
+    prefixes: [dtb, dt]
+    aliases: ["The Derek Trucks Band", "Derek Trucks Band", "Derek Trucks"]
+    active_years: [1994, 2030]
+  - abbrev: kglw
+    name: King Gizzard and the Lizard Wizard
+    prefixes: [kglw]
+    aliases: ["King Gizzard and the Lizard Wizard", "King Gizzard & the Lizard Wizard",
+              "King Gizzard"]
+    active_years: [2010, 2035]
+  # "trey" files the whole Anastasio family the way "jg" files Garcia's, so a
+  # more specific act named later in a folder wins over it.  Folders and track
+  # filenames in this library use both spellings freely - TAB2001-03-04 holds
+  # files called nothing but "01 Track 01.mp3", while tab2005-05-14 holds
+  # trey050514d1_01_18_Steps.mp3 - and the ARTIST tags say both "Trey
+  # Anastasio" and "Trey Anastasio Band" for shows by the same lineup.
+  - abbrev: trey
+    name: Trey Anastasio
+    prefixes: [trey]
+    aliases: ["Trey Anastasio"]
+    family_prefix: true
+    active_years: [1996, 2035]
+    # From 1998 the Band is the billing for nearly everything, so a folder
+    # saying only "Trey" is a TAB show.  The exception is a one-off all-star
+    # billing: the info file for the 2005 New Orleans SuperJam is headed
+    # "TREY ANASTASIO", not the Band, and the same goes for an acoustic or solo
+    # date.  Oysterhead is a different group again.
+    defaults_to: tab
+    defaults_from_year: 1998
+    defaults_unless_named: [superjam, acoustic, solo, oysterhead, benefit]
+  - abbrev: tab
+    name: Trey Anastasio Band
+    prefixes: [tab]
+    aliases: ["Trey Anastasio Band", "TAB"]
+    active_years: [1998, 2035]
+  # "skim" files the Kimock family.  He is the constant across five different
+  # billings, so the folder or the tags almost always name the group rather than
+  # him, and the family prefix only ever wins when nothing more specific does.
+  # No defaults_to here: unlike Garcia, whose late billings were reliably the
+  # Band, a bare "Steve Kimock" spans SKB, an ad-hoc Friends line-up and a
+  # one-off jazz band, and picking one would be a guess.
+  # Tagged both "Disco Biscuits" and "The Disco Biscuits"; the filenames and the
+  # etree names both use db.
+  - abbrev: db
+    name: The Disco Biscuits
+    prefixes: [db]
+    aliases: ["The Disco Biscuits", "Disco Biscuits"]
+    active_years: [1995, 2035]
+  # The folders are etree names that lead with the date, so the act is a token
+  # in the middle: 1999-06-05.paf.neumann.unknown.5884.sbeok.flacf.  Three
+  # spellings are in use across folders and filenames - paf, pf and phil - and
+  # "phil" files the family, so the Quintet named later in a name still wins.
+  - abbrev: paf
+    name: Phil Lesh & Friends
+    prefixes: [paf, pf, phil]
+    aliases: ["Phil Lesh & Friends", "Phil Lesh and Friends", "Phil & Friends",
+              "Phil and Friends", "Phil Lesh"]
+    family_prefix: true
+    active_years: [1994, 2035]
+  # MMW's own folders use the mmw prefix for the collaborations too
+  # (MMW+Cline2014_04_07, "mmw wTrey"), so mmw files the family and a more
+  # specific act named later in the folder or the tags wins over it.
+  - abbrev: mmw
+    name: Medeski Martin & Wood
+    prefixes: [mmw]
+    aliases: ["Medeski Martin & Wood", "Medeski, Martin & Wood",
+              "Medeski, Martin And Wood", "Medeski Martin and Wood", "MMW"]
+    family_prefix: true
+    active_years: [1991, 2035]
+  - abbrev: skim
+    name: Steve Kimock
+    prefixes: [skim]
+    aliases: ["Steve Kimock"]
+    family_prefix: true
+    active_years: [1984, 2035]
+  # Lives under "Live Music\STS9" rather than its own top-level folder, so the
+  # aliases do the work: the folder names say "STS9" or "sts9" and the tags say
+  # all three spellings.  "Sector 9" alone is not listed - it is a common enough
+  # phrase to catch something else, and nothing here needs it.
+  - abbrev: sts9
+    name: STS9
+    prefixes: [sts9]
+    aliases: ["STS9", "Sound Tribe Sector 9", "STS9 (Sound Tribe Sector 9)",
+              "Sound Tribe Sector Nine"]
+    active_years: [1998, 2035]
+
+# Side projects that physically live under a parent artist folder.
+# `parent` is documentation only - it never makes the parent authoritative.
+side_projects:
+  # Folders use both "om" and "moos"; everything standardises on "moos".
+  - abbrev: moos
+    name: Omega Moos
+    prefixes: [moos, om]
+    aliases: ["Omega Moos"]
+    parent: um
+    active_years: [2007, 2015]
+  - abbrev: ohm
+    name: OHMphrey
+    prefixes: [ohmphrey]
+    aliases: ["OHMphrey"]
+    parent: um
+    active_years: [2008, 2020]
+  - abbrev: hlr
+    name: Huey Lewis and the rUMors
+    prefixes: []
+    aliases: ["Huey Lewis and the rUMors", "Huey Lewis and the Rumors"]
+    parent: um
+    active_years: [2009, 2015]
+  # Bad Hat is a real band, not a mislabelled Trey show: the info file for
+  # 9-11-94 at the Iron Horse, Northampton MA lists Trey Anastasio on guitar,
+  # Jon Fishman on drums, Jamie Mansfield on mandolin and Stacie Starkweather
+  # on bass.  Every copy here is from 1994 and spells the prefix a different
+  # way - badhat1994-02-23d2t03, bh.94.09.10d1t1, bad_hat1994-09-11d1t01.
+  #
+  # "bh" was listed here too, and it cost: it claimed two Bruce Hornsby shows
+  # from 1998 and 2002, both of which say "Bruce Hornsby" in ARTIST.  The
+  # active_years below did not save them, because active_years only filters
+  # date candidates - it is never consulted when resolving the band, so a band
+  # cannot be ruled out by a date it could not have played.  All three real Bad
+  # Hat folders are settled as badhat1994-*, and the only remaining bh* folders
+  # in the library are Hornsby's, so the bare prefix is his.
+  - abbrev: badhat
+    name: Bad Hat
+    prefixes: [badhat, bad_hat]
+    aliases: ["Bad Hat"]
+    parent: trey
+    active_years: [1992, 1996]
+  - abbrev: bh
+    name: Bruce Hornsby
+    prefixes: [bh]
+    aliases: ["Bruce Hornsby", "Bruce Hornsby and the Range",
+              "Bruce Hornsby & the Range", "Bruce Hornsby and the Noisemakers",
+              "Bruce Hornsby & the Noisemakers"]
+    active_years: [1986, 2023]
+  # The groups Kimock played in, all filed under his folder.  Each names itself
+  # in the folder prefix and in ARTIST, so none of them relies on the parent.
+  # A named line-up rather than a separate band, but it names itself: the
+  # 2003-11-30 folder says ".paf." while every file inside says plq03-11-30.
+  - abbrev: plq
+    name: Phil Lesh Quintet
+    prefixes: [plq]
+    aliases: ["Phil Lesh Quintet"]
+    parent: paf
+    active_years: [1999, 2004]
+  # John Scofield's records with them are billed MSMW; the tags spell it out as
+  # "Medeski Scofield Martin & Wood".
+  - abbrev: mmws
+    name: Medeski Scofield Martin & Wood
+    prefixes: [mmws, msmw]
+    aliases: ["Medeski Scofield Martin & Wood", "Medeski, Scofield, Martin & Wood",
+              "MSMW", "Medeski Martin & Wood with John Scofield"]
+    parent: mmw
+    active_years: [1998, 2035]
+  # Spelled three ways across two copies of the one Lugano show: "featuring
+  # Nels Cline", "w/ Nels Cline", and MMW+Cline in a folder name.
+  - abbrev: mmwnc
+    name: Medeski Martin & Wood with Nels Cline
+    prefixes: [mmwnc]
+    aliases: ["Medeski, Martin & Wood featuring Nels Cline",
+              "Medeski Martin & Wood featuring Nels Cline",
+              "Medeski Martin & Wood w/ Nels Cline", "MMW feat. Nels Cline",
+              "MMW+Cline"]
+    parent: mmw
+    active_years: [2013, 2035]
+  - abbrev: skb
+    name: Steve Kimock Band
+    prefixes: [skb]
+    aliases: ["Steve Kimock Band", "SKB"]
+    parent: skim
+    active_years: [1998, 2035]
+  - abbrev: kvhw
+    name: KVHW
+    prefixes: [kvhw]
+    aliases: ["KVHW"]
+    parent: skim
+    active_years: [1997, 2001]
+  - abbrev: zero
+    name: Zero
+    prefixes: [zero]
+    aliases: ["Zero"]
+    parent: skim
+    active_years: [1984, 2035]
+  # "SK&F" is how the folder spells it; the ampersand cannot survive a folder
+  # name unescaped everywhere, so both spellings are listed.
+  - abbrev: skf
+    name: Steve Kimock and Friends
+    prefixes: [skf]
+    aliases: ["Steve Kimock and Friends", "Steve Kimock & Friends", "SK&F", "SKF"]
+    parent: skim
+    active_years: [1995, 2035]
+  # Named in the ALBUM tag as "Marijuana Jazz Band"; the folder shortens it to
+  # "marij jazz band" and the filenames to mjb.
+  - abbrev: mjb
+    name: Marijuana Jazz Band
+    prefixes: [mjb]
+    aliases: ["Marijuana Jazz Band", "Marij Jazz Band"]
+    parent: skim
+    active_years: [1998, 2002]
+  # The Jerry Garcia groups are where two-shows-on-one-date (early/late) turns
+  # up, so each iteration gets its own abbreviation rather than being lumped in.
+  #
+  # "jg" is both Jerry Garcia solo AND the family filing prefix: folders are
+  # named jg<date>.jgb, jg<date>.jg_dg and so on, where the token after the
+  # date names the actual act.  family_prefix says so, and a more specific
+  # member of the family found later in the name wins.
+  - abbrev: jg
+    name: Jerry Garcia
+    prefixes: [jg]
+    aliases: ["Jerry Garcia"]
+    family_prefix: true
+    parent: gd
+    active_years: [1970, 1995]
+    # The early-70s groups (Legion of Mary, Reconstruction, the Saunders
+    # bands) had all wound up by the mid 80s; from 1987 on, a folder that says
+    # only "Jerry Garcia" is a Jerry Garcia Band show.  The exceptions are the
+    # billings that name a different lineup - the acoustic band, the Grisman
+    # duo, the Kahn duo, and one-off "and Friends" benefits.
+    defaults_to: jgb
+    defaults_from_year: 1987
+    defaults_unless_named: [friends, acoustic, grisman, saunders, kahn]
+  - abbrev: jgb
+    name: Jerry Garcia Band
+    prefixes: [jgb]
+    aliases: ["Jerry Garcia Band", "Pure Jerry", "Garcia Band"]
+    parent: gd
+    active_years: [1975, 1995]
+  # The one-off benefit and pickup billings - "jg _ friends", and the 1970
+  # shows with John Cipollina.  The library writes these "jgf".
+  - abbrev: jgf
+    name: Jerry Garcia and Friends
+    prefixes: [jgf]
+    aliases: ["Jerry Garcia and Friends", "Jerry Garcia & Friends",
+              "Garcia and Friends"]
+    parent: gd
+    active_years: [1970, 1995]
+  - abbrev: jgms
+    name: Jerry Garcia and Merl Saunders
+    prefixes: [jgms, gams]
+    aliases: ["Jerry Garcia and Merl Saunders", "Jerry Garcia & Merl Saunders",
+              "Garcia and Saunders", "Garcia Saunders", "Merl Saunders"]
+    parent: gd
+    active_years: [1971, 1975]
+  - abbrev: jgdg
+    name: Jerry Garcia and David Grisman
+    prefixes: [jgdg, jgd]
+    # "jg+dg" and "jg_dg" both tokenise to jg / dg, which is how these folders
+    # and filenames are written.
+    aliases: ["Jerry Garcia and David Grisman", "Jerry Garcia & David Grisman",
+              "Garcia Grisman", "David Grisman", "jg dg", "jgdg"]
+    parent: gd
+    active_years: [1990, 1995]
+  - abbrev: jgjk
+    name: Jerry Garcia and John Kahn
+    prefixes: [jgjk]
+    aliases: ["Jerry Garcia and John Kahn", "Jerry Garcia & John Kahn",
+              "Garcia Kahn", "John Kahn"]
+    parent: gd
+    active_years: [1982, 1986]
+  - abbrev: lom
+    name: Legion of Mary
+    prefixes: [lom]
+    aliases: ["Legion of Mary", "Legion Of Mary"]
+    parent: gd
+    active_years: [1974, 1975]
+  - abbrev: rec
+    name: Reconstruction
+    prefixes: [rec]
+    # Folders are written "Reconstruction1979-07-07" and
+    # "Reconstruction_1979-06-16_SBD"; the name is too long for the prefix
+    # rule, so the alias is what catches it.
+    aliases: ["Reconstruction"]
+    parent: gd
+    active_years: [1979, 1980]
+
+# --- source inference ------------------------------------------------------
+# Order of evaluation is fixed in code: matrix beats microphone beats board.
+source_tokens:
+  matrix: [mtx, matrix]
+  # A broadcast is board-sourced, so these all mean sbd.  They are never used
+  # in a folder name - the station call sign is, when one is known.
+  # "alligator" was in here and is the odd one out: every other entry names a
+  # lineage or a broadcast, while Alligator is a song this scene plays often.
+  # It matched the setlist line "06 Alligator >" in a Phil & Friends info file
+  # and, with a microphone also named, raised a source conflict that suppressed
+  # the source altogether - two nights by the same taper on the same rig came
+  # out with different names because of it.
+  soundboard: [sbd, fm, fmsbd, sbdfm, soundboard, board, dsbd,
+               sxm, siriusxm, sirius, simulcast, webcast]
+  audience: [aud, audience]
+
+# Broadcasters.  The call sign identifies the copy and goes in the provenance
+# slot; the generic "fm" / "sxm" markers never do - they only tell the source
+# inference that this came off the board (see source_tokens below).
+# Add call signs as you meet them.
+broadcast:
+  stations: [wxpn, kexp, wfuv, wnew, wbcn, wmmr, kgsr, wxrt, wnyc, wbur,
+             kcrw, kutx, wrlt, wyep, wtmd, wfpk, bbc, npr,
+             # Canadian: the Derek Trucks 2008-09-11 broadcast is CBC Radio 2,
+             # carried on CBU Vancouver.  Both spellings appear in the wild.
+             cbc, cbu]
+
+# Microphone models. Presence of any of these means an audience mic was used.
+# Matched case-insensitively, on separator boundaries, optional trailing "s".
+microphones:
+  - ak40
+  - ak-40
+  - at853
+  - at853rx
+  - at943
+  - at933
+  # Schoeps capsules, bare and glued to the brand.  Boundary matching means
+  # "mk4" will not match inside "schoepsmk4v", so both forms are listed.
+  - mk4
+  - mk4v
+  - mk4minime
+  - mk41
+  - mk21
+  - mk22
+  - mk2
+  - mk5
+  - mk6
+  - mk8
+  - cmc6
+  - kc5
+  - schoepsmk4
+  - schoepsmk4v
+  - schoepsmk41
+  - schoepsmk21
+  - schoepsmk22
+  - mbho
+  - ca-11
+  - ca11
+  - ca-14
+  # AKG C-series, as tapers actually write it: "AKG C414", "AKGC414", "c414".
+  - akg414
+  - akg-414
+  - akgc414
+  # Schoeps CCM 4V, on both Phil & Friends 2012 nights and on
+  # um2012-04-13.ccm4v.zman - the same taper, the same rig.
+  - ccm4v
+  - ccm-4v
+  - ccm4
+  # AKG C61, on zero1997-12-12.late.akgC61.cooper.miller.109291
+  - akgc61
+  - akg-c61
+  - c61
+  - c414
+  # The C414 ships in lettered variants and tapers write the suffix glued on:
+  # "AKG C414xls".  Boundary matching means c414 will not match inside those.
+  - c414xls
+  - c414xlii
+  - c414xl2
+  - c414b
+  - c414buls
+  - c414eb
+  - c451
+  - c460
+  - c422
+  - akg451
+  - akg460
+  # DPA capsule numbers turn up bare ("4011s") and glued to the brand
+  # ("dpa4023"); the matcher treats "dpa4023", "dpa 4023" and "dpa-4023" alike.
+  - "4011"
+  - "4021"
+  - "4022"
+  - "4023"
+  - "4060"
+  - "4061"
+  - dpa4011
+  - dpa4021
+  - dpa4022
+  - dpa4023
+  - dpa4060
+  - dpa4061
+  - schoeps
+  - neumann
+  # seen in the real library: "Microtech Gefell M21 > nBob actives > MixPre-6"
+  - gefell
+  - microtech
+  - m21
+  - m20
+  - m200
+  - nbob
+  - naiant
+  - church audio
+  - busman
+  - km140
+  - km184
+  - b&k
+  - dpa
+  - sennheiser
+  # Sennheiser models as etree names actually write them: "senn421", "md421".
+  - senn421
+  - senn441
+  - senn21
+  - md421
+  - md441
+  - mkh20
+  - mkh30
+  - mkh40
+  - mke2
+  # Sony ECM models, as they are written in etree names ("sonyECM99").
+  - sonyecm99
+  - sonyecm280
+  - sonyecm909
+  - ecm99
+  - ecm280
+  - ecm909
+  - nak300
+  - nak700
+  - beyer
+  - m201
+
+# Canonical taper slugs.  Provenance is part of the folder name, so a taper
+# gets exactly one spelling: their online handle, or their surname.  The key is
+# what gets written; the list is every raw string that should map to it.
+# Anything not listed falls back to the surname/handle heuristic and is flagged
+# in the report so you can add it here.
+tapers:
+  miller: ["Charlie Miller", "charliemiller", "cmiller", "charlie miller/ dat"]
+  padelimike: ["PADeliMike", "PADelimike", "padeli mike"]
+  vwmule: ["VWMULE", "vw mule"]
+  zman: ["Z-Man", "the zman"]
+  ldl: ["LDL"]
+  leary: ["Leary"]
+
+# Where to look a show up by hand when the library cannot settle it.  These are
+# printed next to undated and low-confidence folders in the reports; nothing in
+# the pipeline goes near the network.
+references:
+  default: "https://archive.org/"
+  # Studio and compilation releases are not on the setlist sites; Discogs is
+  # where a release name and year get confirmed.
+  albums: "https://www.discogs.com/"
+  bands:
+    ph: "https://phish.net/"
+    um: "https://allthings.umphreys.com"
+    mmj: "https://archive.mymorningjacket.net/"
+    gd: "https://jerrybase.com/"
+    jgb: "https://jerrybase.com/"
+    jgms: "https://jerrybase.com/"
+    jgdg: "https://jerrybase.com/"
+    jgjk: "https://jerrybase.com/"
+    lom: "https://jerrybase.com/"
+    kglw: "https://kglw.net/"
+
+# --- provenance ------------------------------------------------------------
+# Stores / labels / official channels.  `source` is the source we are allowed to
+# INFER when no explicit source evidence exists.  Every inference is logged and
+# stamped into a SOURCE_CONFIDENCE tag.
+provenance:
+  nugs:
+    aliases: [nugs, "nugs.net", nugsnet]
+    source: sbd
+    official: true
+  livephish:
+    aliases: [livephish, "livephish.com", "live phish"]
+    source: sbd
+    official: true
+  deadnet:
+    aliases: ["dead.net", deadnet, "grateful dead productions"]
+    source: sbd
+    official: true
+  umlive:
+    aliases: [umlive, "umlive.net", "um live"]
+    source: sbd
+    official: true
+  bandcamp:
+    aliases: [bandcamp]
+    source: sbd
+    official: true
+  # NB: archive.org and etree.org are deliberately absent.  They are where a
+  # copy was distributed, not whose copy it is, and putting "archive" in a
+  # folder name says nothing useful.  With no taper, the field is left out.
+
+# Official release series. Matching one of these is a strong OFFICIAL signal.
+# `multi_date: true` means the release spans several shows - reported, never renamed.
+official_series:
+  - name: "Dave's Picks"
+    band: gd
+    patterns: ["dave's picks", "daves picks"]
+    release_id: "dp{n}"
+    multi_date: true
+  - name: "Dick's Picks"
+    band: gd
+    patterns: ["dick's picks", "dicks picks"]
+    release_id: "dp{n}"
+    multi_date: true
+  - name: "Road Trips"
+    band: gd
+    patterns: ["road trips"]
+    multi_date: true
+  - name: "Download Series"
+    band: gd
+    patterns: ["download series"]
+    multi_date: false
+  - name: "Pure Jerry"
+    band: jgb
+    patterns: ["pure jerry"]
+    multi_date: true
+  - name: "Spring 1990"
+    band: gd
+    patterns: ["spring 1990", "spring 90"]
+    multi_date: true
+  # Box sets that hold one folder per night.  Listed so that being a release
+  # is a stated fact rather than a guess from shape: without these, "holds
+  # several shows" was the only test, and a taper's two-night bundle looked
+  # exactly like Europe '72.
+  - name: "30 Trips Around The Sun"
+    band: gd
+    patterns: ["30 trips around the sun", "thirty trips around the sun"]
+    multi_date: true
+  - name: "Europe '72 Complete Recordings"
+    band: gd
+    patterns: ["europe '72", "europe 72"]
+    multi_date: true
+  - name: "May 1977"
+    band: gd
+    patterns: ["may 1977"]
+    multi_date: true
+  - name: "July 1978"
+    band: gd
+    patterns: ["july 1978"]
+    multi_date: true
+  - name: "June 1976"
+    band: gd
+    patterns: ["june 1976"]
+    multi_date: true
+  - name: "Winterland 1973"
+    band: gd
+    patterns: ["winterland 1973"]
+    multi_date: true
+  - name: "Here Comes Sunshine"
+    band: gd
+    patterns: ["here comes sunshine"]
+    multi_date: true
+  - name: "In and Out of the Garden"
+    band: gd
+    patterns: ["in and out of the garden"]
+    multi_date: true
+  - name: "Without a Net"
+    band: gd
+    patterns: ["without a net"]
+    multi_date: true
+  - name: "Winterland"
+    band: gd
+    patterns: ["winterland june", "winterland 1973"]
+    multi_date: true
+
+# Tokens that suggest the folder is not a concert at all.
+non_show_tokens:
+  - itunes session
+  - rsd
+  - record store day
+  - single
+  - " ep"
+  - "(ep)"
+  - demo
+  - studio
+  - soundtrack
+  - compilation
+  - greatest hits
+  - b-sides
+  - promo
+
+# Folder-name suffixes that describe the audio format rather than the show.
+format_suffixes:
+  - shnf
+  - shn
+  - m4a
+  - wma
+  - flacf
+  - flac
+  - flac16
+  - flac24
+  - flac1644
+  - flac2496
+  - flac2448
+  - flac16bit
+  - flac24bit
+  - mp3
+  - v0
+  - v2
+  - "320"
+  - m4a
+
+# Bracketed quality tokens seen in official / store folder names.
+quality_tokens:
+  flac24: ["flac24", "flac-24", "flac 24", "24bit", "2496", "2448"]
+  flac16: ["flac16", "flac-16", "flac 16", "1644"]
+  mp3: ["v0", "v2", "320", "mp3"]
+
+us_states: [AL, AK, AZ, AR, CA, CO, CT, DE, FL, GA, HI, ID, IL, IN, IA, KS, KY,
+            LA, ME, MD, MA, MI, MN, MS, MO, MT, NE, NV, NH, NJ, NM, NY, NC, ND,
+            OH, OK, OR, PA, RI, SC, SD, TN, TX, UT, VT, VA, WA, WV, WI, WY, DC]

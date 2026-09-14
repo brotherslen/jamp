@@ -1,0 +1,28 @@
+# An example of your own jamp.yaml.  Copy it into your user folder (the path
+# every run prints as "your config") and edit it there.
+#
+# It is laid over the one the tool ships.
+#
+# Anything here is added to, or replaces, the shipped config:
+#   * settings are replaced one at a time;
+#   * lists (ignore_folders, microphones, tokens...) gain what you add;
+#   * a band or side project with a shipped abbreviation replaces that entry
+#     whole, and a new abbreviation adds an act;
+#   * an official series with a shipped name replaces it.
+# Updating the tool never touches this file.
+
+settings:
+  # Folders that are not live shows and are never scanned.  A bare name matches
+  # anywhere; a path matches that folder specifically.
+  ignore_folders:
+    - Studio
+    - "Some Band/Official Albums"
+
+# An act the shipped list does not have.  The abbreviation becomes the prefix
+# of every folder name for this act, so choose it with care.
+bands:
+  - abbrev: bs
+    name: Billy Strings
+    prefixes: [bs]
+    aliases: ["Billy Strings"]
+    active_years: [2012, 2035]

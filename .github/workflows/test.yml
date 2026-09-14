@@ -1,0 +1,43 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+      - name: ffmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y --no-progress
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t jamp .
+      - name: the image runs, and finds ffmpeg with Shorten
+        run: |
+          mkdir -p lib/Phish reports
+          docker run --rm -v "$PWD/lib:/music" -v "$PWD/reports:/reports" \
+            jamp init --root /music --out-dir /reports
+          docker run --rm jamp doctor | tee doctor.txt
+          ! grep -q "missing: .*shorten" doctor.txt

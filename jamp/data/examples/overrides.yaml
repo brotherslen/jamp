@@ -1,0 +1,20 @@
+# An example overrides.yaml.  Copy it into your user folder and edit it there.
+#
+# Things you have told the tool that the files themselves do not say.  Matched
+# on the folder name as it is on disk, before any renaming - or, for a key
+# with a slash in it, on the folder's path inside the library.  An override
+# beats every other kind of evidence, so each one is reported wherever it is
+# used.
+#
+# Fields: date, band, venue, city, state, source, provenance, format, marker,
+#         classification, skip, note
+
+folders:
+
+  "My Band - New Years Eve 2006":
+    date: 2006-12-31
+    note: the show that saw 2006 out, not the one that rang it in.
+
+  "Some Band/Official Albums/Live at the Fillmore":
+    skip: true
+    note: an official multi-disc release with no one date - leave it alone.

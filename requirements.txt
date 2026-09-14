@@ -1,0 +1,5 @@
+mutagen>=1.47      # reading and (in phase 2) writing FLAC/MP3/MP4 tags
+PyYAML>=6.0        # the config file
+
+# development only
+pytest>=8.0

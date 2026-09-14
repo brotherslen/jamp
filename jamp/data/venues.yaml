@@ -1,0 +1,1123 @@
+# Venues: the rooms this library knows, and the ways they get written.
+#
+# This exists because the same room is spelled several ways - Alpine
+# Valley Music Theater and Music Theatre, Riverport Amphitheater and
+# Amphitheatre, RFK Stadium and Robert F. Kennedy Stadium - and because
+# a folder often names a room without naming its city, which the
+# City, ST guard then rejects, losing the venue entirely.
+#
+# A name here is NOT assumed unique. There is an Orpheum Theatre in
+# Boston and another in San Francisco. A lookup that cannot tell which
+# room is meant declines rather than guessing - see jamp/venues.py.
+#
+# Seeded by tools/build_gazetteer.py from the settled library and from
+# the places stated by hand in overrides.yaml; maintained here after.
+
+venues:
+- name: WorkPlay SoundStage
+  city: Birmingham
+  state: AL
+  aliases: []
+- name: Zydeco
+  city: Birmingham
+  state: AL
+  aliases: []
+- name: Chester's Place
+  city: Fayetteville
+  state: AR
+  aliases: []
+- name: Rialto Theater
+  city: Tucson
+  state: AZ
+  aliases: []
+  generic: true
+- name: Commodore Ballroom
+  city: Vancouver
+  state: BC
+  aliases: []
+- name: Pacific Coliseum
+  city: Vancouver
+  state: BC
+  aliases: []
+- name: The Brickyard
+  city: Vancouver
+  state: BC
+  aliases: []
+- name: The Gate
+  city: Vancouver
+  state: BC
+  aliases: []
+- name: Cafe Tomo
+  city: Arcata
+  state: CA
+  aliases: []
+- name: East Gym, Humboldt State University
+  city: Arcata
+  state: CA
+  aliases: []
+- name: Keystone
+  city: Berkeley
+  state: CA
+  aliases: []
+- name: The Cow Palace
+  city: Daly City
+  state: CA
+  aliases: []
+- name: Nevada County Fairgrounds
+  city: Grass Valley
+  state: CA
+  aliases: []
+- name: Wiltern
+  city: Los Angeles
+  state: CA
+  aliases: []
+- name: Sweetwater Saloon
+  city: Mill Valley
+  state: CA
+  aliases: []
+- name: Laguna Seca Raceway
+  city: Monterey
+  state: CA
+  aliases: []
+- name: Shoreline Amphitheatre
+  city: Mountain View
+  state: CA
+  aliases: []
+- name: Keystone
+  city: Palo Alto
+  state: CA
+  aliases: []
+- name: French's Camp (Eel River)
+  city: Piercy
+  state: CA
+  aliases: []
+- name: The Country Club
+  city: Reseda
+  state: CA
+  aliases: []
+- name: Open Air Theater
+  city: San Diego
+  state: CA
+  aliases: []
+- name: Sports Arena
+  city: San Diego
+  state: CA
+  aliases: []
+- name: Bill Graham Civic Auditorium
+  city: San Francisco
+  state: CA
+  aliases: []
+- name: Fillmore Auditorium
+  city: San Francisco
+  state: CA
+  aliases: []
+- name: Maritime Hall
+  city: San Francisco
+  state: CA
+  aliases: []
+- name: Nob Hill Masonic Auditorium
+  city: San Francisco
+  state: CA
+  aliases: []
+- name: Orpheum Theatre
+  city: San Francisco
+  state: CA
+  aliases:
+  - orpheum theatre
+  generic: true
+- name: Pacific High Studio
+  city: San Francisco
+  state: CA
+  aliases: []
+- name: The Fillmore
+  city: San Francisco
+  state: CA
+  aliases: []
+  generic: true
+- name: The Stone
+  city: San Francisco
+  state: CA
+  aliases: []
+- name: Warfield Theater
+  city: San Francisco
+  state: CA
+  aliases:
+  - The Warfield Theater
+  - Warfield Theatre
+- name: Alex Madonna Expo Center
+  city: San Luis Obispo
+  state: CA
+  aliases: []
+- name: Anaconda Theater, UCSB
+  city: Santa Barbara
+  state: CA
+  aliases: []
+- name: Palookaville
+  city: Santa Cruz
+  state: CA
+  aliases: []
+- name: Goldcoast Concert Bowl
+  city: Squaw Valley
+  state: CA
+  aliases: []
+- name: Ventura County Farigrounds
+  city: Ventura
+  state: CA
+  aliases: []
+- name: Wheeler Opera House
+  city: Aspen
+  state: CO
+  aliases: []
+- name: The Mishawaka
+  city: Bellvue
+  state: CO
+  aliases: []
+- name: Fox Theatre
+  city: Boulder
+  state: CO
+  aliases: []
+  generic: true
+- name: Ten Mile Room
+  city: Breckenridge
+  state: CO
+  aliases: []
+- name: Dick’s Sporting Goods Park
+  city: Commerce City
+  state: CO
+  aliases:
+  - Dick's Sporting Goods Park
+  - Dicks Sporting Goods Park
+- name: McNichols Sports Arena
+  city: Denver
+  state: CO
+  aliases: []
+- name: Gothic Theater
+  city: Englewood
+  state: CO
+  aliases: []
+- name: Washington's
+  city: Fort Collins
+  state: CO
+  aliases: []
+- name: Early Show
+  city: Morrison
+  state: CO
+  aliases: []
+- name: Late Show
+  city: Morrison
+  state: CO
+  aliases: []
+- name: Red Rocks Amphitheatre
+  city: Morrison
+  state: CO
+  aliases:
+  - Red Rocks Amphitheater
+- name: The Inferno
+  city: Steamboat Springs
+  state: CO
+  aliases: []
+- name: Bushnell Auditorium
+  city: Hartford
+  state: CT
+  aliases: []
+- name: Civic Center
+  city: Hartford
+  state: CT
+  aliases: []
+  generic: true
+- name: XL Center
+  city: Hartford
+  state: CT
+  aliases: []
+- name: Taft School
+  city: Watertown
+  state: CT
+  aliases: []
+- name: 9:30 Club
+  city: Washington
+  state: DC
+  aliases:
+  - 930 Club
+- name: Constitution Hall
+  city: Washington
+  state: DC
+  aliases: []
+- name: Robert F. Kennedy Stadium
+  city: Washington
+  state: DC
+  aliases: []
+- name: Florida Theater
+  city: Gainesville
+  state: FL
+  aliases: []
+- name: O'Connell Center
+  city: Gainesville
+  state: FL
+  aliases: []
+- name: Florida Bayfront Park Amphitheater
+  city: Miami
+  state: FL
+  aliases: []
+- name: The Ritz Theater
+  city: Tampa
+  state: FL
+  aliases: []
+- name: Ameris Bank Amphitheatre
+  city: Alpharetta
+  state: GA
+  aliases: []
+- name: 40 Watt
+  city: Athens
+  state: GA
+  aliases: []
+- name: Georgia Theatre
+  city: Athens
+  state: GA
+  aliases: []
+- name: The 40 Watt Club
+  city: Athens
+  state: GA
+  aliases: []
+- name: Aaron's Amp at Lakewood
+  city: Atlanta
+  state: GA
+  aliases: []
+- name: Fox Theatre
+  city: Atlanta
+  state: GA
+  aliases: []
+  generic: true
+- name: Lakewood Amphitheatre
+  city: Atlanta
+  state: GA
+  aliases: []
+- name: Phish, The Omni
+  city: Atlanta
+  state: GA
+  aliases: []
+- name: The Tabernacle
+  city: Atlanta
+  state: GA
+  aliases: []
+- name: Variety Playhouse
+  city: Atlanta
+  state: GA
+  aliases: []
+- name: Philipshalle
+  city: Dusseldorf
+  state: GERMANY
+  aliases: []
+- name: Waldbuhn
+  city: Nordheim
+  state: GERMANY
+  aliases: []
+- name: Resi
+  city: Nuremberg
+  state: GERMANY
+  aliases: []
+- name: Student Union Ballroom
+  city: Iowa City
+  state: IA
+  aliases: []
+- name: Boise State University Pavilion
+  city: Boise
+  state: ID
+  aliases: []
+- name: Assembly Hall
+  city: Champaign
+  state: IL
+  aliases: []
+- name: Auditorium Theatre
+  city: Chicago
+  state: IL
+  aliases: []
+- name: Congress Theater
+  city: Chicago
+  state: IL
+  aliases: []
+- name: Huntington Bank Pavilion at Northerly Island
+  city: Chicago
+  state: IL
+  aliases: []
+- name: Kinetic Playground
+  city: Chicago
+  state: IL
+  aliases: []
+- name: Park West
+  city: Chicago
+  state: IL
+  aliases: []
+- name: Schuba's
+  city: Chicago
+  state: IL
+  aliases: []
+- name: Thalia Hall
+  city: Chicago
+  state: IL
+  aliases: []
+- name: UIC Pavilion
+  city: Chicago
+  state: IL
+  aliases: []
+- name: UIC Pavillion
+  city: Chicago
+  state: IL
+  aliases: []
+- name: Durty Nellie's
+  city: Palatine
+  state: IL
+  aliases: []
+- name: Bluebird
+  city: Bloomington
+  state: IN
+  aliases: []
+- name: Murat Theatre
+  city: Indianapolis
+  state: IN
+  aliases: []
+- name: Deer Creek Music Center
+  city: Noblesvile
+  state: IN
+  aliases: []
+- name: Deer Creek Amphitheater
+  city: Noblesville
+  state: IN
+  aliases: []
+- name: Deer Creek Music Center
+  city: Noblesville
+  state: IN
+  aliases: []
+- name: Rouff Music Center
+  city: Noblesville
+  state: IN
+  aliases: []
+- name: Verizon Wireless Music Center (DEER CREEK!)
+  city: Noblesville
+  state: IN
+  aliases: []
+- name: Big Cat
+  city: Osaka
+  state: JAPAN
+  aliases: []
+- name: Phish Rupp Arena
+  city: Lexington
+  state: KY
+  aliases: []
+- name: Rupp Arena
+  city: Lexington
+  state: KY
+  aliases: []
+- name: Freedom Hall
+  city: Louisville
+  state: KY
+  aliases: []
+- name: Headliners Music Hall
+  city: Louisville
+  state: KY
+  aliases: []
+- name: KFC Yum Center
+  city: Louisville
+  state: KY
+  aliases: []
+- name: The Palace Theater
+  city: Louisville
+  state: KY
+  aliases: []
+  generic: true
+- name: Waterfront Park
+  city: Louisville
+  state: KY
+  aliases: []
+- name: New Orleans Jazz & Heritage Fest
+  city: New Orleans
+  state: LA
+  aliases: []
+- name: University of Massachusetts
+  city: Amherst
+  state: MA
+  aliases: []
+- name: Fleet Center
+  city: Boston
+  state: MA
+  aliases: []
+- name: Orpheum Theater
+  city: Boston
+  state: MA
+  aliases:
+  - Orpheum Theatre
+  generic: true
+- name: Boarding House Park
+  city: Lowell
+  state: MA
+  aliases: []
+- name: Great Woods
+  city: Mansfield
+  state: MA
+  aliases: []
+- name: Great Woods Amphitheatre
+  city: Mansfield
+  state: MA
+  aliases:
+  - Great Woods Amphitheater
+- name: Greatwoods Center for the Performing Arts
+  city: Mansfield
+  state: MA
+  aliases: []
+- name: Iron Horse
+  city: Northampton
+  state: MA
+  aliases: []
+- name: DCU Center
+  city: Worcester
+  state: MA
+  aliases: []
+- name: The Centrum
+  city: Worcester
+  state: MA
+  aliases: []
+- name: Merriweather Post Pavilion
+  city: Columbia
+  state: MD
+  aliases: []
+- name: Merriweather Post Pavillion
+  city: Columbia
+  state: MD
+  aliases: []
+- name: Capital Centre
+  city: Landover
+  state: MD
+  aliases: []
+- name: Loring Air Force Base
+  city: Limestone
+  state: ME
+  aliases: []
+- name: Loring Commerce Centre
+  city: Limestone
+  state: ME
+  aliases: []
+- name: Cumberland County Civic Center
+  city: Portland
+  state: ME
+  aliases: []
+- name: The Palace
+  city: Auburn Hills
+  state: MI
+  aliases: []
+- name: DTE Energy Music Theatre
+  city: Clarkston
+  state: MI
+  aliases: []
+- name: Fox Theater
+  city: Detroit
+  state: MI
+  aliases: []
+  generic: true
+- name: DeVos Hall
+  city: Grand Rapids
+  state: MI
+  aliases:
+  - Devos Hall
+- name: 10K Lakes Festival
+  city: Detroit Lakes
+  state: MN
+  aliases: []
+- name: First Avenue
+  city: Minneapolis
+  state: MN
+  aliases: []
+- name: State Theater
+  city: Minneapolis
+  state: MN
+  aliases: []
+  generic: true
+- name: Target Center
+  city: Minneapolis
+  state: MN
+  aliases: []
+- name: Municipal Auditorium
+  city: Kansas City
+  state: MO
+  aliases: []
+- name: Riverport Amphitheater
+  city: Maryland Heights
+  state: MO
+  aliases:
+  - Riverport Amphitheatre
+- name: American Theater
+  city: St. Louis
+  state: MO
+  aliases: []
+- name: Chaifetz Arena
+  city: St. Louis
+  state: MO
+  aliases: []
+- name: Harvest Jazz & Blues Festival
+  city: Fredericton
+  state: NB
+  aliases: []
+- name: The Cat's Cradle
+  city: Carrboro
+  state: NC
+  aliases: []
+- name: Cricket Arena
+  city: Charlotte
+  state: NC
+  aliases: []
+- name: Walnut Creek Amphitheatre
+  city: Raleigh
+  state: NC
+  aliases: []
+- name: Ziggy's
+  city: Winston Salem
+  state: NC
+  aliases: []
+- name: UNH Fieldhouse
+  city: Durham
+  state: NH
+  aliases: []
+- name: The Music Hall
+  city: Portsmouth
+  state: NH
+  aliases: []
+- name: Convention Hall
+  city: Asbury Park
+  state: NJ
+  aliases: []
+  generic: true
+- name: Boardwalk Hall
+  city: Atlantic City
+  state: NJ
+  aliases: []
+- name: E Center
+  city: Camden
+  state: NJ
+  aliases:
+  - E Centre
+- name: Tweeter Center
+  city: Camden
+  state: NJ
+  aliases: []
+- name: PNC Bank Arts Center
+  city: Holmdel
+  state: NJ
+  aliases: []
+- name: Capitol Theater
+  city: Passaic
+  state: NJ
+  aliases:
+  - Capitol Theatre
+  generic: true
+- name: Pan American Center
+  city: Las Cruces
+  state: NM
+  aliases: []
+- name: MGM Grand Garden Arena
+  city: Las Vegas
+  state: NV
+  aliases: []
+- name: Thomas & Mack Center
+  city: Las Vegas
+  state: NV
+  aliases: []
+- name: Palace Theater
+  city: Albany
+  state: NY
+  aliases: []
+  generic: true
+- name: Pepsi Arena
+  city: Albany
+  state: NY
+  aliases: []
+- name: Bearville Studios
+  city: Bearsville
+  state: NY
+  aliases: []
+- name: Anderson Center
+  city: Binghamton
+  state: NY
+  aliases: []
+- name: Broome County Forum
+  city: Binghamton
+  state: NY
+  aliases: []
+- name: Baby's All Right
+  city: Brooklyn
+  state: NY
+  aliases: []
+- name: Brooklyn Steel
+  city: Brooklyn
+  state: NY
+  aliases: []
+- name: Keyspan Park
+  city: Brooklyn
+  state: NY
+  aliases: []
+- name: Darien Lake PAC
+  city: Darien Center
+  state: NY
+  aliases: []
+- name: Glens Falls Civic Center
+  city: Glens Falls
+  state: NY
+  aliases: []
+- name: Sessions @ West 54th St
+  city: NYC
+  state: NY
+  aliases: []
+- name: Bowery Ballroom
+  city: New York
+  state: NY
+  aliases: []
+- name: Ed Sullivan Theatre
+  city: New York
+  state: NY
+  aliases: []
+- name: MSG
+  city: New York
+  state: NY
+  aliases: []
+- name: Madison Square Garden
+  city: New York
+  state: NY
+  aliases: []
+- name: Radio City Music Hall
+  city: New York
+  state: NY
+  aliases: []
+- name: Randall's Island
+  city: New York
+  state: NY
+  aliases: []
+- name: Roseland Ballroom
+  city: New York
+  state: NY
+  aliases: []
+- name: The Academy
+  city: New York City
+  state: NY
+  aliases: []
+- name: Wetlands Preserve
+  city: New York City
+  state: NY
+  aliases: []
+- name: Arrowhead Ranch
+  city: Parksville
+  state: NY
+  aliases: []
+- name: Capitol Theatre
+  city: Port Chester
+  state: NY
+  aliases: []
+  generic: true
+- name: The Chance
+  city: Poughkeepsie
+  state: NY
+  aliases: []
+- name: Saratoga Performing Arts Center
+  city: Saratoga Springs
+  state: NY
+  aliases: []
+- name: Music Mountain
+  city: South Fallsburg
+  state: NY
+  aliases: []
+- name: Nassau Coliseum
+  city: Uniondale
+  state: NY
+  aliases: []
+- name: Jones Beach Music Theater
+  city: Wantagh
+  state: NY
+  aliases: []
+- name: Magnaball
+  city: Watkins Glen
+  state: NY
+  aliases: []
+- name: CSU Convocation Center
+  city: Cleveland
+  state: OH
+  aliases: []
+- name: Tower City Amphitheatre
+  city: Cleveland
+  state: OH
+  aliases: []
+- name: LC Pavilion
+  city: Columbus
+  state: OH
+  aliases: []
+- name: Veterans Memorial Auditorium
+  city: Columbus
+  state: OH
+  aliases: []
+- name: Blossom Music Center
+  city: Cuyahoga Falls
+  state: OH
+  aliases: []
+- name: Ervin J. Nutter Center
+  city: Dayton
+  state: OH
+  aliases: []
+- name: sbd.flac, Nutter Center
+  city: Dayton
+  state: OH
+  aliases: []
+- name: KSU MAC Center
+  city: Kent
+  state: OH
+  aliases: []
+- name: The Opera House
+  city: Toronto
+  state: 'ON'
+  aliases: []
+  generic: true
+- name: Crystal Ballroom
+  city: Portland
+  state: OR
+  aliases: []
+- name: Portland Meadows
+  city: Portland
+  state: OR
+  aliases: []
+- name: Roseland Ballroom
+  city: Portland
+  state: OR
+  aliases: []
+- name: Roseland Theatre
+  city: Portland
+  state: OR
+  aliases: []
+- name: McKenzie Ballroom
+  city: Springfield
+  state: OR
+  aliases: []
+- name: First Niagara Pavilion
+  city: Burgettstown
+  state: PA
+  aliases: []
+- name: Star Lake Amphitheatre
+  city: Burgettstown
+  state: PA
+  aliases: []
+- name: Keswick Theater
+  city: Glenside
+  state: PA
+  aliases:
+  - Keswick Theatre
+- name: Hershey Park Arena
+  city: Hershey
+  state: PA
+  aliases: []
+- name: Chestnut Cabaret
+  city: Philadelphia
+  state: PA
+  aliases: []
+- name: First Union Spectrum
+  city: Philadelphia
+  state: PA
+  aliases: []
+- name: The Mann
+  city: Philadelphia
+  state: PA
+  aliases: []
+- name: Trocadero Theater
+  city: Philadelphia
+  state: PA
+  aliases: []
+- name: Graffiti's
+  city: Pittsburgh
+  state: PA
+  aliases: []
+- name: Metropol
+  city: Pittsburgh
+  state: PA
+  aliases: []
+- name: Tower Theater
+  city: Upper Darby
+  state: PA
+  aliases:
+  - Tower Theatre
+- name: Civic Center =
+  city: Providence
+  state: RI
+  aliases:
+  - Civic Center
+- name: Providence Civic Center
+  city: Providence
+  state: RI
+  aliases: []
+- name: The Pour House
+  city: James Island
+  state: SC
+  aliases: []
+- name: Tennessee Theater
+  city: Knoxville
+  state: TN
+  aliases: []
+- name: Bonnaroo Music Festival
+  city: Manchester
+  state: TN
+  aliases: []
+- name: Mid-South Coliseum
+  city: Memphis
+  state: TN
+  aliases: []
+- name: Murphy Center
+  city: Murfreesboro
+  state: TN
+  aliases: []
+- name: Communications Building B, University of Texas
+  city: Austin
+  state: TX
+  aliases: []
+- name: Granada Theatre
+  city: Dallas
+  state: TX
+  aliases: []
+  generic: true
+- name: The Bomb Factory
+  city: Dallas
+  state: TX
+  aliases: []
+- name: Cynthia Mitchell Woods Pavilion
+  city: Houston
+  state: TX
+  aliases: []
+- name: The Heights Theater
+  city: Houston
+  state: TX
+  aliases: []
+- name: USANA Amphitheatre
+  city: West Valley
+  state: UT
+  aliases: []
+- name: The E Center
+  city: West Valley City
+  state: UT
+  aliases: []
+- name: Patriot Center
+  city: Fairfax
+  state: VA
+  aliases: []
+- name: Hampton Coliseum
+  city: Hampton
+  state: VA
+  aliases: []
+- name: Haymaker Festival
+  city: Spotsylvania
+  state: VA
+  aliases: []
+- name: Battery Park
+  city: Burlington
+  state: VT
+  aliases: []
+- name: Flynn Theatre
+  city: Burlington
+  state: VT
+  aliases: []
+- name: The Front
+  city: Burlington
+  state: VT
+  aliases: []
+- name: Champlain Valley Exposition (Soundcheck)
+  city: Essex Junction
+  state: VT
+  aliases: []
+- name: Phish Summer Stage at Sugarbush
+  city: North Fayston
+  state: VT
+  aliases: []
+- name: Peter Danforth's House
+  city: Underhill
+  state: VT
+  aliases: []
+- name: Gorge Amphitheatre
+  city: George
+  state: WA
+  aliases: []
+- name: The Gorge
+  city: George
+  state: WA
+  aliases: []
+- name: Evergreen College
+  city: Olympia
+  state: WA
+  aliases: []
+- name: The Gorge
+  city: Quincy
+  state: WA
+  aliases: []
+- name: Alpine Valley Music Center
+  city: East Troy
+  state: WI
+  aliases: []
+- name: Alpine Valley Music Theatre
+  city: East Troy
+  state: WI
+  aliases:
+  - Alpine Valley Music Theater
+- name: Kohl Center
+  city: Madison
+  state: WI
+  aliases: []
+- name: Eagles Ballroom
+  city: Milwaukee
+  state: WI
+  aliases: []
+- name: Riverside Theater
+  city: Milwaukee
+  state: WI
+  aliases: []
+- name: Bonnaroo
+  city: Manchester
+  state: TN
+  aliases:
+  - Bonnaroo Music Festival
+  - Bonnaroo Music & Arts Festival
+  - Great Stage Park
+  - Roo
+- name: Vegoose
+  city: Las Vegas
+  state: NV
+  aliases:
+  - Vegoose Music Festival
+  - Sam Boyd Stadium
+- name: Summer Camp Music Festival
+  city: Chillicothe
+  state: IL
+  aliases:
+  - Summer Camp
+  - Three Sisters Park
+  - SCamp
+- name: 10K Lakes Festival
+  city: Detroit Lakes
+  state: MN
+  aliases:
+  - 10KLF
+  - 10K Lakes
+  - Soo Pass Ranch
+- name: Wanee Festival
+  city: Live Oak
+  state: FL
+  aliases:
+  - Wanee
+  - Spirit of the Suwannee Music Park
+- name: Telluride Bluegrass Festival
+  city: Telluride
+  state: CO
+  aliases:
+  - Telluride Town Park
+  - Telluride Music Festival
+- name: New Orleans Jazz & Heritage Festival
+  city: New Orleans
+  state: LA
+  aliases:
+  - Jazz Fest
+  - JazzFest
+  - New Orleans Jazz & Heritage Fest
+  - Fair Grounds Race Course
+- name: High Sierra Music Festival
+  city: Quincy
+  state: CA
+  aliases:
+  - High Sierra
+  - Plumas-Sierra County Fairgrounds
+- name: Electric Forest
+  city: Rothbury
+  state: MI
+  aliases:
+  - Double JJ Ranch
+  - Rothbury Festival
+- name: Peach Music Festival
+  city: Scranton
+  state: PA
+  aliases:
+  - The Peach
+  - Montage Mountain
+- name: Hangout Music Festival
+  city: Gulf Shores
+  state: AL
+  aliases:
+  - Hangout Fest
+  - Hangout
+- name: Forecastle Festival
+  city: Louisville
+  state: KY
+  aliases:
+  - Forecastle
+- name: Camp Bisco
+  city: Scranton
+  state: PA
+  aliases:
+  - Montage Mountain Resort
+- name: The Clifford Ball
+  city: Plattsburgh
+  state: NY
+  aliases:
+  - Clifford Ball
+  - Plattsburgh Air Force Base
+  - Plattsburgh AFB
+- name: The Great Went
+  city: Limestone
+  state: ME
+  aliases:
+  - Great Went
+- name: Lemonwheel
+  city: Limestone
+  state: ME
+  aliases: []
+- name: IT
+  city: Limestone
+  state: ME
+  aliases:
+  - IT Festival
+- name: Loring Air Force Base
+  city: Limestone
+  state: ME
+  aliases:
+  - Loring AFB
+  - Loring Commerce Centre
+  - Loring Commerce Center
+  - Loring
+- name: Camp Oswego
+  city: Volney
+  state: NY
+  aliases:
+  - Oswego County Airport
+  - Oswego
+- name: Big Cypress
+  city: Big Cypress
+  state: FL
+  aliases:
+  - Big Cypress Seminole Indian Reservation
+  - Big Cypress Seminole Reservation
+- name: Coventry
+  city: Coventry
+  state: VT
+  aliases:
+  - Newport State Airport
+- name: Festival 8
+  city: Indio
+  state: CA
+  aliases:
+  - Empire Polo Club
+  - Festival Eight
+- name: Super Ball IX
+  city: Watkins Glen
+  state: NY
+  aliases:
+  - Superball IX
+  - Super Ball
+  - Superball
+- name: Magnaball
+  city: Watkins Glen
+  state: NY
+  aliases: []
+- name: Curveball
+  city: Watkins Glen
+  state: NY
+  aliases: []
+- name: Mondegreen
+  city: Dover
+  state: DE
+  aliases:
+  - The Woodlands

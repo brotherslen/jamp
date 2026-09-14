@@ -1,0 +1,11 @@
+# Things you have told the tool that the files themselves do not say.
+#
+# Matched on the folder name as it is on disk, before any renaming - or, for a
+# key with a slash in it, on the folder's path inside the library.  An override
+# beats every other kind of evidence, so each one is reported wherever it is
+# used.  See examples/overrides.yaml in the tool's data folder.
+#
+# Fields: date, band, venue, city, state, source, provenance, format, marker,
+#         classification, skip, note
+
+folders: {}

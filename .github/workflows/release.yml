@@ -1,0 +1,85 @@
+name: standalone builds
+
+# A tag like v0.2.0 builds a single-file jamp for each OS and attaches them to
+# a GitHub release. "Run workflow" builds them without releasing.
+on:
+  push:
+    tags: ["v*"]
+    # A change to the build itself builds it, without releasing anything.
+    branches: [main]
+    paths: ["packaging/**", ".github/workflows/release.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: jamp-windows-x64
+          - os: macos-latest
+            name: jamp-macos-arm64
+          - os: macos-15-intel
+            name: jamp-macos-intel
+          - os: ubuntu-latest
+            name: jamp-linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install . pyinstaller
+      - name: build
+        run: >
+          pyinstaller --noconfirm --onefile --console --name jamp
+          --collect-data jamp packaging/entry.py
+      - name: smoke test - a new user, from outside the repository
+        shell: bash
+        run: |
+          set -e
+          E="$PWD/dist/jamp"
+          cd "$RUNNER_TEMP"
+          export JAMP_HOME="$RUNNER_TEMP/home"
+          mkdir -p "lib/Grateful Dead/gd1977-05-08.sbd.miller.flac16" reports
+          "$E" --version
+          "$E" init --root "$RUNNER_TEMP/lib" --out-dir "$RUNNER_TEMP/reports"
+          "$E" acts | tee acts.txt
+          grep -q "Grateful Dead (gd)" acts.txt
+          "$E" unpack
+          "$E" phase1
+          "$E" doctor
+      - name: package
+        shell: bash
+        run: |
+          mkdir -p "${{ matrix.name }}"
+          cp dist/jamp* "${{ matrix.name }}/"
+          cp packaging/README-standalone.txt "${{ matrix.name }}/README.txt"
+          cp LICENSE THIRD-PARTY-NOTICES.md "${{ matrix.name }}/"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.name }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: zip each build
+        run: for d in jamp-*; do (cd "$d" && zip -r "../$d.zip" .); done
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: jamp-*.zip
+          # v0.2.0-beta1 and the like are pre-releases.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            Standalone builds of jamp for Windows, macOS (Apple Silicon and
+            Intel) and Linux. Unzip, open a terminal in the folder, and run
+            `jamp init`. ffmpeg is not included - see README.txt inside.
+
+            Guide: https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/docs/guide.md

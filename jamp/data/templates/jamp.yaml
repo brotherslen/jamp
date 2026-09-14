@@ -1,0 +1,27 @@
+# Your own jamp.yaml, laid over the one the tool ships.
+#
+# Anything here is added to, or replaces, the shipped config:
+#   * settings are replaced one at a time;
+#   * lists (ignore_folders, microphones, tokens...) gain what you add;
+#   * a band or side project with a shipped abbreviation replaces that entry
+#     whole, and a new abbreviation adds an act;
+#   * an official series with a shipped name replaces it.
+# Updating the tool never touches this file.  See examples/jamp.yaml in the
+# tool's data folder for a filled-in one.
+
+settings:
+  # Folders that are not live shows and are never scanned: studio albums,
+  # compilations, photos.  A bare name matches anywhere; a path such as
+  # "Some Band/Official Albums" matches that folder only.
+  ignore_folders: []
+
+# Acts the shipped list does not have.  The abbreviation becomes the prefix of
+# every folder name for that act, so choose it with care.  Phase 0 writes a
+# phase0_bands_stub.yaml with a guess for every act it could not place.
+#
+# bands:
+#   - abbrev: bs
+#     name: Billy Strings
+#     prefixes: [bs]
+#     aliases: ["Billy Strings"]
+#     active_years: [2012, 2035]
