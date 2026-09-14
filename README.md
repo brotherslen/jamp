@@ -12,8 +12,10 @@ names, tags and checksum files - without destroying anything.
 It reads what each folder already says - the name, the track filenames, the
 tags, the info file (where the venue above came from) - and works out the act,
 the date, the source, the taper and the venue. It knows fan recordings from
-official releases, leaves releases their own names, and can fill missing venues and song titles from archive.org,
-phish.in, phish.net, jerrybase and the My Morning Jacket archive.
+official releases, leaves releases their own names, and can fill missing venues
+and song titles from archive.org, phish.in, phish.net, jerrybase and the My
+Morning Jacket archive. It also extracts shows still in ZIP files and converts
+SHN to FLAC, proving each conversion lossless.
 
 ## What it promises
 
@@ -29,9 +31,11 @@ phish.in, phish.net, jerrybase and the My Morning Jacket archive.
 
 ## Quick start
 
-Download the standalone build for your system, or with Python 3.11 or newer
-run `pip install .` in a copy of this repository, or use
-[Docker](docs/docker.md). Then:
+Download the standalone build for Windows, macOS (Apple Silicon or Intel) or
+Linux from [Releases](https://github.com/brotherslen/jamp/releases), or with
+Python 3.11 or newer run `pip install .` in a copy of this repository, or use
+[Docker](docs/docker.md). Converting SHN needs [ffmpeg](https://ffmpeg.org/download.html),
+which is not included. Then:
 
 ```bash
 jamp init                        # where your library is, where reports go
@@ -61,7 +65,7 @@ jamp phase2 --artist "Grateful Dead" --commit --until-settled
 
 ## Status
 
-Built on and used for one large collection on Windows, where it has renamed and
+**Beta** (0.2.0b1). Built on and used for one large collection on Windows, where it has renamed and
 retagged over 800 shows across thirteen acts. Its tests run on Windows, macOS
 and Linux on every change, but day-to-day use so far has been on Windows. Back
 up a library before its first commit.
