@@ -5,4 +5,4 @@ phase 3 fills tags from reference sources, and `complete` asks whether a
 recording is missing songs.  See README.md.
 """
 
-__version__ = "0.2.0b1"
+__version__ = "0.2.0b2"

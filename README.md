@@ -66,7 +66,7 @@ jamp apply --artist "Grateful Dead" --commit
 
 ## Status
 
-**Beta** (0.2.0b1). Built on and used for one large collection on Windows, where it has renamed and
+**Beta** (0.2.0b2). Built on and used for one large collection on Windows, where it has renamed and
 retagged over 800 shows across thirteen acts. Its tests run on Windows, macOS
 and Linux on every change, but day-to-day use so far has been on Windows. Back
 up a library before its first commit.

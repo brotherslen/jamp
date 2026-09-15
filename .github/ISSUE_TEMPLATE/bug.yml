@@ -1,0 +1,80 @@
+name: Something went wrong
+description: A crash, a refusal you did not expect, or a plan that would name or tag something wrongly.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying jamp. The reports it writes are what make a problem fixable, so
+        this form asks for a few of them.
+
+        **Before pasting anything:** reports contain your folder names and paths. Remove
+        whatever you would rather not post. Never paste a phish.net API key.
+  - type: dropdown
+    id: install
+    attributes:
+      label: How you run jamp
+      options:
+        - Standalone download - Windows
+        - Standalone download - macOS Apple Silicon
+        - Standalone download - macOS Intel
+        - Standalone download - Linux
+        - pip install (Python)
+        - Docker
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `jamp --version`.
+      placeholder: jamp 0.2.0b2
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: jamp doctor
+      description: The whole output of `jamp doctor`.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: The command you ran
+      description: Exactly as typed, with any paths you are happy to share.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+      description: |
+        If a folder would be named or tagged wrongly, give its current name, the name jamp
+        proposed, and the name you think is right.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: What jamp printed
+      description: The terminal output, including any error or traceback.
+      render: text
+  - type: textarea
+    id: reports
+    attributes:
+      label: Reports
+      description: |
+        From your reports folder, whichever apply. Drag files in, or paste the relevant part.
+        - `phase1_summary.txt` from `jamp plan`
+        - `phase2_summary.txt` from `jamp apply`
+        - for one folder: its rows in `phase1_folders.csv` and `phase1_issues.csv`
+        Earlier runs are kept in `history/` inside the reports folder.
+  - type: checkboxes
+    id: committed
+    attributes:
+      label: Did anything get written?
+      options:
+        - label: This happened during a `--commit` run (tell us whether the folder was rolled back)

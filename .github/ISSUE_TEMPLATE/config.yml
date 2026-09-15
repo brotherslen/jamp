@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: The guide
+    url: https://github.com/brotherslen/jamp/blob/main/docs/guide.md
+    about: Setting up, reading a plan, committing, undoing - and "When something goes wrong".

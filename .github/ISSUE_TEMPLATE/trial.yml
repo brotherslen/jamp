@@ -1,0 +1,57 @@
+name: Trial report
+description: How a run on your collection went - what worked, what confused you, what was missing.
+labels: [trial]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        No problem is too small to mention: a confusing message, a step the guide skipped,
+        an act or venue jamp did not know. Reports contain folder names and paths - remove
+        anything you would rather not post.
+  - type: dropdown
+    id: install
+    attributes:
+      label: How you run jamp
+      options:
+        - Standalone download - Windows
+        - Standalone download - macOS Apple Silicon
+        - Standalone download - macOS Intel
+        - Standalone download - Linux
+        - pip install (Python)
+        - Docker
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `jamp --version`.
+    validations:
+      required: true
+  - type: textarea
+    id: collection
+    attributes:
+      label: Your collection
+      description: Roughly how many shows, which acts, which formats (FLAC, MP3, SHN...), how it was organised before.
+  - type: textarea
+    id: ran
+    attributes:
+      label: What you ran
+      description: Which commands, on which acts, and whether you committed.
+    validations:
+      required: true
+  - type: textarea
+    id: plan
+    attributes:
+      label: How the plan read
+      description: |
+        Did the proposed names look right? Paste the "Outcome per folder" block from
+        `phase1_summary.txt`, and any names that looked wrong.
+  - type: textarea
+    id: rough
+    attributes:
+      label: What was confusing, missing or wrong
+  - type: textarea
+    id: good
+    attributes:
+      label: What worked well
