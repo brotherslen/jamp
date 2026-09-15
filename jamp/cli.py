@@ -94,16 +94,20 @@ def _settings_record(cfg, overrides_path: Path | None) -> dict[str, str]:
         "your venues": userdir.user_dir() / VENUES_NAME,
         "your overrides": overrides_path,
     }
+    # What each file held, not where it was.  A standalone build unpacks itself
+    # into a new temporary folder on every run, so the shipped config's path
+    # differed between every dry run and its commit and every commit was
+    # refused - found by the first run of a downloaded build, not by the tests,
+    # which run from source where the path never moves.
     out = {}
     for label, path in files.items():
         if path is None:
             out[label] = "none"
             continue
         try:
-            digest = hashlib.sha1(Path(path).read_bytes()).hexdigest()
+            out[label] = hashlib.sha1(Path(path).read_bytes()).hexdigest()
         except OSError:
-            digest = "absent"
-        out[label] = "%s %s" % (path, digest)
+            out[label] = "absent"
     return out
 
 
@@ -483,7 +487,7 @@ def main(argv: list[str] | None = None) -> int:
         print("ROOT and --out-dir are required. Give them once with "
               "--remember and later runs can leave them out:"
               + chr(10) +
-              '  py -m jamp plan "<library>" --out-dir "<reports>" --remember',
+              '  jamp plan "<library>" --out-dir "<reports>" --remember',
               file=sys.stderr)
         return 2
     root = args.root.resolve()

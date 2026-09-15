@@ -1,6 +1,7 @@
 """A commit carries out the plan that was read, and reads again only what changed."""
 import json
 import shutil
+from pathlib import Path
 
 import pytest
 
@@ -210,6 +211,24 @@ def test_a_commit_with_other_settings_than_its_dry_run_is_refused(library, tmp_p
     err = capsys.readouterr().err
     assert "different settings: your config" in err
     assert not _settled(library)
+
+
+def test_the_same_settings_from_another_folder_still_match(library, tmp_path, home,
+                                                          monkeypatch):
+    """A standalone build unpacks its shipped config somewhere new on every run."""
+    import shutil as _shutil
+
+    from jamp import config as _config
+
+    out = tmp_path / "r"
+    assert cli.main(["plan", str(library), "--out-dir", str(out)]) == 0
+    moved = tmp_path / "_MEI_second_run" / "data"
+    _shutil.copytree(Path(_config.__file__).parent / "data", moved)
+    real_load = _config.load_config
+    monkeypatch.setattr(cli, "load_config",
+                        lambda path=None, **kw: real_load(path or moved / "jamp.yaml", **kw))
+    assert cli.main(["apply", str(library), "--out-dir", str(out), "--commit"]) == 0
+    assert len(_settled(library)) == 2
 
 
 def test_changed_overrides_refuse_the_commit_too(library, tmp_path, home, capsys):
