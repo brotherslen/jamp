@@ -870,3 +870,19 @@ def test_a_number_that_is_part_of_a_venue_name_survives():
     assert make_location("Cafe 1930", "Arcata", "CA") == "Cafe 1930, Arcata, CA"
     assert make_location("Bourbon Street", "New Orleans", "LA") == \
         "Bourbon Street, New Orleans, LA"
+
+
+@pytest.mark.parametrize("folder, expected", [
+    ("Phish - 2019-06-16 - Bonnaroo - Manchester, TN [FLAC]", "Bonnaroo, Manchester, TN"),
+    ("Grateful Dead - 1977-05-08 - Barton Hall - Ithaca, NY", "Barton Hall, Ithaca, NY"),
+    ("My Morning Jacket 2006-06-16 Bonnaroo, Manchester, TN", "Bonnaroo, Manchester, TN"),
+    ("1976-06-14 New York, NY", "New York, NY"),
+    ("ph1995-11-18 Wilkes-Barre, PA", "Wilkes Barre, PA"),
+])
+def test_a_place_in_a_band_date_venue_city_folder_name(cfg, tmp_path, folder, expected):
+    """The act's name leads, and the parts are separated by spaced dashes."""
+    from jamp.analyze import venue_from_folder_name
+    from jamp.scan import ShowFolder
+    show = ShowFolder(path=tmp_path / folder, root=tmp_path, artist_dir=None)
+    got, _ = venue_from_folder_name(show, cfg)
+    assert got == expected

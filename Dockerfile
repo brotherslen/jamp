@@ -8,7 +8,7 @@
 # See docs/docker.md.
 FROM python:3.11-slim
 
-# ffmpeg for `jamp convert` and `phase0 --verify-audio`. Debian's build
+# ffmpeg for `jamp convert` and `scan --verify-audio`. Debian's build
 # includes the Shorten decoder.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \

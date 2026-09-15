@@ -237,10 +237,21 @@ def _clean_title(raw: str) -> str:
 # tags
 # --------------------------------------------------------------------------
 
+# Vorbis comments that hold a whole picture, base64-encoded.  Nothing reads the
+# image, and kept as text it was 48 MB of the library's 57 MB of saved reads.
+_VORBIS_PICTURES = frozenset({"METADATA_BLOCK_PICTURE", "COVERART"})
+
+
 def _normalize_vorbis(tags) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for key, values in tags.items():
-        out.setdefault(key.upper(), []).extend(str(v) for v in values)
+        key = key.upper()
+        if key in _VORBIS_PICTURES:
+            # The key stays, so a picture is still seen to be there.
+            out.setdefault(key, []).extend(
+                "<picture, %d characters of base64>" % len(str(v)) for v in values)
+            continue
+        out.setdefault(key, []).extend(str(v) for v in values)
     return out
 
 

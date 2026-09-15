@@ -165,6 +165,64 @@ def test_a_folder_with_no_repeats_reports_nothing():
     assert identity.repeated_within(identity.index_folders([show("s", t1="aa", t2="bb")])) == []
 
 
+# --- plan builds it, and says the same as scan ------------------------------
+
+def _flac_with_md5(path, md5: bytes, samples: int = 44100 * 60):
+    """A FLAC whose STREAMINFO carries this audio MD5 and length."""
+    import fixtures
+
+    fixtures.make_flac(path, tags={"ARTIST": "Phish"})
+    data = bytearray(path.read_bytes())
+    # STREAMINFO follows "fLaC" and a 4-byte block header: samples are the low
+    # 36 bits ending at byte 18 of the block, and the MD5 the 16 bytes after.
+    block = 8
+    packed = int.from_bytes(data[block + 10:block + 18], "big")
+    packed = (packed & ~((1 << 36) - 1)) | samples
+    data[block + 10:block + 18] = packed.to_bytes(8, "big")
+    data[block + 18:block + 34] = md5
+    path.write_bytes(bytes(data))
+
+
+def test_plan_writes_the_identity_reports_scan_writes(tmp_path):
+    import csv
+
+    from jamp import phase0, phase1
+    from jamp.config import load_config
+
+    root = tmp_path / "lib"
+    for folder in ("ph1997-11-22.sbd.flac16", "ph1997-11-22 copy"):
+        for n, md5 in ((1, b"\x11" * 16), (2, b"\x22" * 16)):
+            _flac_with_md5(root / "Phish" / folder / ("ph1997-11-22d1t0%d.flac" % n), md5)
+    cfg = load_config(user_path=None)
+    phase0.run(root, tmp_path / "scan", cfg)
+    phase1.run(root, tmp_path / "plan", cfg)
+
+    def rows(path):
+        with open(path, newline="", encoding="utf-8-sig") as fh:
+            return list(csv.reader(fh))
+
+    for name in ("audio_identity", "same_audio"):
+        assert rows(tmp_path / "scan" / ("phase0_%s.csv" % name)) == \
+            rows(tmp_path / "plan" / ("phase1_%s.csv" % name))
+    same = rows(tmp_path / "plan" / "phase1_same_audio.csv")
+    assert len(same) == 2 and same[1][0] == identity.IDENTICAL
+    summary = (tmp_path / "plan" / "phase1_summary.txt").read_text(encoding="utf-8")
+    assert "Folders holding the same audio (1)" in summary
+
+
+def test_scan_no_longer_writes_a_bands_stub_and_points_to_acts(tmp_path):
+    import fixtures
+    from jamp import phase0
+    from jamp.config import load_config
+
+    root = tmp_path / "lib"
+    fixtures.make_flac(root / "Billy Strings" / "2021-10-31 Hampton" / "01.flac")
+    phase0.run(root, tmp_path / "scan", load_config(user_path=None))
+    assert not (tmp_path / "scan" / "phase0_bands_stub.yaml").exists()
+    summary = (tmp_path / "scan" / "phase0_summary.txt").read_text(encoding="utf-8")
+    assert "jamp acts" in summary and "Billy Strings" in summary
+
+
 def test_the_summary_counts_recordings_not_files():
     a = show("a", t1="aa", t2="bb")
     b = show("b", t1="aa", t2="bb")

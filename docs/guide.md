@@ -236,7 +236,7 @@ your user folder; see [reference.md](reference.md#your-jampyaml).
 ## 6. Take stock
 
 ```bash
-jamp phase0
+jamp scan
 ```
 
 walks the library and counts what is there: formats, how folders are named,
@@ -244,18 +244,22 @@ which acts and dates it can read, which folders are official releases, which
 it cannot read at all. It changes nothing. Read `phase0_summary.txt` in your
 reports folder.
 
-Two reports are worth knowing about:
+Worth knowing about:
 
-- `phase0_bands_stub.yaml` - a draft entry for every act it could not place,
-  if you would rather write acts into `jamp.yaml` by hand.
+- The summary lists the folders no configured act claims. Add them with
+  `jamp acts` (section 5).
 - `phase0_same_audio.csv` - folders that share audio, found from the
   fingerprint every FLAC carries. A pair that shares every track is the same
-  recording twice, whatever the names say.
+  recording twice, whatever the names say. `plan` writes the same report,
+  `phase1_same_audio.csv`, so you do not need `scan` for it.
+
+`scan` is optional. It is the whole-library view, and the way to run the audio
+check in section 13; `plan` reads everything it needs itself.
 
 ## 7. Plan one act
 
 ```bash
-jamp phase1 --artist "Grateful Dead"
+jamp plan --artist "Grateful Dead"
 ```
 
 `--artist` is the name of a top-level folder in your library. Leave it out and
@@ -305,16 +309,21 @@ rename in `phase1_tracks.csv`, and every note in `phase1_issues.csv`.
 
 ## 8. Commit
 
-When the plan is what you want, run the same command as `phase2` with
+When the plan is what you want, run the same command as `apply` with
 `--commit`, **into the same reports folder**:
 
 ```bash
-jamp phase2 --artist "Grateful Dead" --commit --until-settled
+jamp apply --artist "Grateful Dead" --commit
 ```
 
-The commit is refused unless that reports folder holds a phase 1 plan for the
-same library and the same `--artist` - it is how the tool knows there was a
-dry run to read.
+The commit is refused unless that reports folder holds a plan for the
+same library, the same `--artist`, and the same `--reclassify` and `--unnest`
+choices - it is how the tool knows that what it commits is what you read.
+It holds each folder to that plan too: a folder whose files have changed since
+the dry run, or whose plan now comes out differently, is left exactly as it is
+and listed in `phase2_summary.txt` - run `plan` again to see what it would do.
+Files unchanged since the dry run are not read again, which is most of what a
+commit on a large act used to spend its time on.
 
 For each folder it:
 
@@ -330,22 +339,25 @@ If any step fails, that folder is put back as it was and the run carries on
 with the next. Stopping the run with Ctrl-C puts back the folder it was in the
 middle of.
 
-`--until-settled` repeats until a pass changes nothing: a commit can reveal
-something the next pass acts on (a folder freed from a wrapper, a venue now in
-the tags). It ends with **SETTLED: nothing is left to do**, plus what was left
-alone on purpose - blocked folders, duplicates.
+A commit repeats until a pass changes nothing: one pass can reveal something
+the next acts on (a folder freed from a wrapper, a venue now in the tags). It
+ends with **SETTLED: nothing is left to do**, plus what was left alone on
+purpose - blocked folders, duplicates. No dry run showed what those later passes
+did, so `phase2_summary.txt` lists every folder they committed. `--one-pass`
+stops after the first.
 
 Run it again at any time: a settled folder is left as it is. To have the tool
 reconsider settled folders - after adding an override, say - add `--reclassify`
 to both the dry run and the commit.
 
 **Keep the reports folder** until you are happy with the result.
-`phase2_committed.csv` is the record of what changed, and the next run into the
-same folder replaces it. A new reports folder per act is a good habit:
+`phase2_committed.csv` is the record of what changed. A later run into the same
+folder moves it into `history/` rather than losing it, but a new reports folder
+per act keeps each act's record easy to find:
 
 ```bash
-jamp phase1 --artist "Grateful Dead" --out-dir "C:\jamp-reports\gd"
-jamp phase2 --artist "Grateful Dead" --out-dir "C:\jamp-reports\gd" --commit --until-settled
+jamp plan --artist "Grateful Dead" --out-dir "C:\jamp-reports\gd"
+jamp apply --artist "Grateful Dead" --out-dir "C:\jamp-reports\gd" --commit
 ```
 
 ## 9. Answers the files do not contain
@@ -400,7 +412,7 @@ venues:
 
 ## 10. Split shows, wrappers and lossy copies
 
-Three phase 2 flags move files. Each is off unless given, and each deserves a
+Three `apply` flags move files. Each is off unless given, and each deserves a
 run of its own, dry run first, so that if something looks wrong you know which
 did it.
 
@@ -410,21 +422,34 @@ did it.
 - **`--unnest`** lifts a show out of a wrapper folder that holds nothing else
   (`Downloads/gd1977-05-08.../`). It never lifts a show to the top of your
   library, and it leaves the emptied wrapper behind.
+  Give it to the dry run too - `jamp plan --unnest` lists every lift, and
+  a commit with it needs a dry run with it.
 - **`--quarantine-lossy`** moves an MP3 folder that duplicates a lossless copy
   of the same recording into `_etree_review/` at the top of your library,
   mirroring where it was, for you to review and delete yourself.
 
-Emptied folders are left where they are. On Windows,
-`tools/empty_dirs.ps1 -Root "<folder>"` lists the completely empty ones and
-`-Commit` removes them; anything holding even one file is left alone.
+Emptied folders are left where they are. To clear them:
+
+```bash
+jamp tidy
+jamp tidy --commit
+```
+
+The dry run lists every folder with nothing at all inside - or holding only
+such folders - and the commit removes exactly those, checking each again just
+before. A folder holding even one file is never removed: folders with files
+but no audio are listed for you to look at, since an info file left in a
+wrapper may be the only description of the show that moved out of it. Ignored
+folders are not looked inside, and the library and any `--artist` folder you
+name are never removed themselves.
 
 ## 11. Filling gaps from the internet
 
-Once an act is settled, `phase3` asks reference sites what your files never
+Once an act is settled, `lookup` asks reference sites what your files never
 said - a missing venue, missing song titles:
 
 ```bash
-jamp phase3 --artist "Grateful Dead"
+jamp lookup --artist "Grateful Dead"
 ```
 
 | source | covers | durations |
@@ -445,11 +470,11 @@ It writes a report first, `phase3_summary.txt`, and changes nothing. To write
 what it found:
 
 ```bash
-jamp phase3 --apply --commit
+jamp lookup --apply --commit
 ```
 
 `--apply` refuses to run without that report. It backs up and logs like
-phase 2. A filled venue reaches the folder name on the next phase 1 and 2 run.
+`apply`. A filled venue reaches the folder name on the next `plan` and `apply`.
 
 **phish.net** needs a key: request one free at https://phish.net/api/keys/, save
 the private key in a text file outside the library, and pass
@@ -458,16 +483,18 @@ covers the same shows.
 
 ## 12. Is a recording missing songs?
 
-`jamp complete` compares each recording's track lengths with the setlist and
+`jamp check` compares each recording's track lengths with the setlist and
 reports recordings that stop early, miss a set, or have songs cut out. It needs
-phase 0's reports and a show database built from phase 3's cache with
-`tools/distill_cache.py`, and it never goes online. See
-[reference.md](reference.md#jamp-complete).
+the track lengths `plan` (or `scan`) measured - run it into the same reports
+folder first - and a show database, which `jamp lookup --seed` writes beside
+`lookup`'s cache and `check` refreshes from the cache when it is out of date.
+It never goes online. See
+[reference.md](reference.md#jamp-check).
 
 ## 13. Checking the audio itself (optional)
 
 ```bash
-jamp phase0 --verify-audio
+jamp scan --verify-audio
 ```
 
 decodes every FLAC with ffmpeg and checks it against the fingerprint stored
@@ -475,6 +502,11 @@ inside it, which finds files that play but are silently damaged. **It is
 optional and slow**: on a large library it runs for hours at full CPU. Nothing
 else in the tool needs it. Run it when you want to know, not as part of
 setting up. `--workers` sets how many files are decoded at once (default 4).
+
+It keeps a running record, `verify_audio_ledger.csv`, in your reports
+folder: stop it at any point, run the same command again into the same
+reports folder, and it picks up where it stopped - a file already checked
+is not decoded again unless it has changed since.
 
 Results are in `phase0_verify_audio.csv`: `PASS`, `MISMATCH` (it decodes, but to
 different audio than it should), `UNREADABLE`, or `NO_MD5` (the file carries no
@@ -521,9 +553,9 @@ same rename again. If you want the folder left as it is for good, add it to
 
 ## 15. When something goes wrong
 
-**"--commit refused: no phase 1 dry run..."** - run the `phase1` command it
-prints, read the plan, then commit. The dry run and the commit need the same
-reports folder and the same `--artist` flags.
+**"--commit refused: ..."** - run the `plan` command it prints, read the
+plan, then commit. The dry run and the commit need the same reports folder, the
+same `--artist` flags, and the same `--reclassify` and `--unnest`.
 
 **"Access is denied" and a folder rolled back (Windows).** Antivirus and Windows
 Search open files the moment they change. The tool retries briefly; if it keeps
@@ -551,10 +583,10 @@ paths are enabled.
 newer jamp on that folder. Update jamp; this version leaves the folder alone
 rather than misread it.
 
-**Phase 3 "stopped asking" a site.** The site kept failing - down, or asking for
-fewer requests. Phase 3 already waits and retries when a site asks it to; after
+**`lookup` "stopped asking" a site.** The site kept failing - down, or asking for
+fewer requests. `lookup` already waits and retries when a site asks it to; after
 several failures in a row it leaves that site alone for the rest of the run.
-Run phase 3 again later: everything already fetched is cached.
+Run `lookup` again later: everything already fetched is cached.
 
 **The reports from an earlier run disappeared.** Each run replaces the reports
 in its folder. Use a new `--out-dir` for anything you want to keep.

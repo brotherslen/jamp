@@ -294,6 +294,17 @@ def _norm_word(text: str) -> str:
     return re.sub(r"[^a-z0-9]", "", text.lower())
 
 
+def _leading_band_name(text: str, cfg: Config) -> int:
+    """The length of a known act's name or alias at the start of `text`, or 0."""
+    names = sorted({n for b in cfg.bands for n in (b.name, *b.aliases) if len(n) > 2},
+                   key=len, reverse=True)
+    for name in names:
+        m = re.match(r"^\s*%s(?=[\s._,-]|$)" % re.escape(name), text, flags=re.I)
+        if m:
+            return m.end()
+    return 0
+
+
 def _band_prefixes(cfg: Config) -> set[str]:
     out: set[str] = set()
     for band in cfg.bands:
@@ -340,10 +351,23 @@ def venue_from_folder_name(show: ShowFolder, cfg: Config) -> tuple[str | None, s
     lead = re.match(r"^([A-Za-z]{1,6})(?=[\s._-]|$)", text)
     if lead and _norm_word(lead.group(1)) in _band_prefixes(cfg):
         text = text[lead.end():]
+    else:
+        # ...or the act's name written out, which only a known act's name can
+        # be: "Phish - 2019-06-16 - Bonnaroo - Manchester, TN" read as the
+        # place "Phish Bonnaroo Manchester, TN".
+        lead_name = _leading_band_name(text, cfg)
+        if lead_name:
+            text = text[lead_name:]
     # Words that describe the product, not the place: "gd 1973-11-09 Box Set
     # Winterland Arena San Francisco CA CD REL".
     text = _JUNK_WORDS.sub(" ", text)
-    text = re.sub(r"[\s._-]+", " ", text).strip(" .-_")
+    # A spaced dash separates the parts of a place, the way a comma does:
+    # "Bonnaroo - Manchester, TN" is a room and its city.  Collapsed into a
+    # space it became "Bonnaroo Manchester, TN", one long city.  An unspaced
+    # dash is part of a name ("Wilkes-Barre") and is left to the collapse below.
+    text = re.sub(r"\s+[-–—]\s+", " , ", text)
+    text = re.sub(r"[\s._-]+", " ", text)
+    text = re.sub(r"\s*(?:,\s*)+", ", ", text).strip(" .-_,")
 
     m = _CITY_STATE.search(text)
     if not m:

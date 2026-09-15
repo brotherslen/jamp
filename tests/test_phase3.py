@@ -1043,7 +1043,7 @@ from jamp.showstore import ShowStore
 def _make_store(tmp_path, rows):
     """rows: (source, key, date, venue, city, state, act, [(pos,title,secs,segue)])"""
     import sqlite3
-    from tools.distill_cache import SCHEMA
+    from jamp.distill import SCHEMA
 
     p = tmp_path / "shows.sqlite"
     db = sqlite3.connect(str(p))

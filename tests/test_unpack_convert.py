@@ -300,3 +300,25 @@ def test_a_failed_move_puts_every_extracted_folder_back(tmp_path, monkeypatch):
     with pytest.raises(PermissionError):
         unpack.extract(zp)
     assert sorted(p.name for p in (tmp_path / "Dead").iterdir()) == ["two.zip"]
+
+
+def test_macos_resource_forks_are_left_in_the_zip(tmp_path):
+    fork = b"\x00\x05\x16\x07" + b"\x00" * 4092
+    z = _zip(tmp_path / "Phish" / "hartford.zip", {
+        "2009-08-14 Hartford/ph090814d1_01.flac": b"fLaC real audio",
+        "2009-08-14 Hartford/__ph090814d1_01.flac": fork,
+        "__MACOSX/2009-08-14 Hartford/._ph090814d1_01.flac": fork,
+    })
+    zp = unpack.plan_zip(z)
+    assert zp.skipped == 2
+    assert [str(m.dest) for m in zp.members] == ["2009-08-14 Hartford/ph090814d1_01.flac"]
+    assert [t.name for t in zp.targets] == ["2009-08-14 Hartford"]
+    unpack.extract(zp)
+    assert sorted(p.name for p in (tmp_path / "Phish" / "2009-08-14 Hartford").iterdir()) == [
+        "ph090814d1_01.flac"]
+    assert unpack.contents_proven(zp) is None
+
+
+def test_a_file_merely_named_like_a_fork_is_kept(tmp_path):
+    z = _zip(tmp_path / "A" / "x.zip", {"x/__notes.txt": b"real notes, not a fork"})
+    assert unpack.plan_zip(z).skipped == 0

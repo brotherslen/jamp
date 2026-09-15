@@ -21,8 +21,9 @@ SHN to FLAC, proving each conversion lossless.
 
 - **Nothing is written without `--commit`**, and a commit is refused until
   there is a dry run of the same thing to read.
-- **Nothing is deleted.** ZIPs and SHN files are replaced only by copies proven
-  identical, and the originals are set aside, not removed.
+- **No file is ever deleted.** ZIPs and SHN files are replaced only by copies
+  proven identical, and the originals are set aside, not removed. `jamp tidy`
+  removes folders with nothing at all in them, and only those.
 - **A date or an act is never guessed.** A folder it is not sure about is
   listed with the reason and left exactly as it is.
 - **Every tag is backed up before it changes**, every change is logged, and
@@ -42,13 +43,13 @@ jamp init                        # where your library is, where reports go
 jamp unpack                      # ZIPs to extract (add --commit to do it)
 jamp convert                     # SHN to convert to FLAC (add --commit)
 jamp acts                        # which folder is which act
-jamp phase1 --artist "Grateful Dead"
+jamp plan --artist "Grateful Dead"
 ```
 
 Read `phase1_summary.txt` in your reports folder. When the plan is right:
 
 ```bash
-jamp phase2 --artist "Grateful Dead" --commit --until-settled
+jamp apply --artist "Grateful Dead" --commit
 ```
 
 ## Documentation

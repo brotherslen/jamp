@@ -135,8 +135,8 @@ def run_init(args) -> int:
     print("  jamp unpack          ZIP files that still need extracting")
     print("  jamp convert         SHN files to convert to FLAC")
     print("  jamp acts            which folders are which act; add the unknown ones")
-    print("  jamp phase0          what is in the library")
-    print('  jamp phase1 --artist "<a folder in your library>"')
+    print("  jamp scan            what is in the library")
+    print('  jamp plan --artist "<a folder in your library>"')
     print("                        what would be renamed and retagged, for one act")
     print("Read the reports in %s before ever adding --commit." % out_dir)
     return code
@@ -176,7 +176,7 @@ def _ffmpeg_checks(report: _Report, explicit: str | None) -> None:
     ffmpeg, how = locate_ffmpeg(explicit)
     if not ffmpeg:
         report.add(WARN, "ffmpeg", "%s. Needed for jamp convert (SHN to FLAC) "
-                   "and the optional phase0 --verify-audio. Download: "
+                   "and the optional scan --verify-audio. Download: "
                    "https://ffmpeg.org/download.html" % how)
         return
     try:
@@ -231,6 +231,9 @@ def run_doctor(args) -> int:
         report.add(OK, "config", "%d acts, %d venues%s" % (
             len(cfg.bands), len(cfg.venues or ()),
             ", with yours laid over" if cfg.user_path else ", shipped only"))
+        unseen = userdir.unseen_settings(cfg.user_path is not None)
+        if unseen:
+            report.add(FAIL, "your settings", unseen.replace("\n", " "))
     except (ConfigError, OSError, ValueError) as exc:
         report.add(FAIL, "config", str(exc))
 

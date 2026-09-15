@@ -48,7 +48,7 @@ jobs:
           "$E" acts | tee acts.txt
           grep -q "Grateful Dead (gd)" acts.txt
           "$E" unpack
-          "$E" phase1
+          "$E" plan
           "$E" doctor
       - name: package
         shell: bash

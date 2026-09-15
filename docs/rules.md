@@ -25,16 +25,21 @@ surprises are one of these rules doing its job. How to run the tool is in
 
 These override everything else.
 
-1. **Dry run by default.** Only the `--commit` runs of `phase2`, `phase3
+1. **Dry run by default.** Only the `--commit` runs of `apply`, `lookup
    --apply`, `unpack`, `convert` and `restore` write. Nothing else has any way
    to rename, move, delete or tag.
-2. **A commit follows its dry run.** `phase2 --commit` needs a phase 1 plan for
-   the same library and scope in its reports folder.
-3. **Nothing is deleted.** A few opt-in operations move files: merging a split
+2. **A commit follows its dry run.** `apply --commit` needs a plan in
+   its reports folder for the same library, scope, `--reclassify` and
+   `--unnest`, so what is committed is what was read. Each folder is held to
+   it: one whose files changed after the dry run, or whose plan now comes out
+   differently, is left alone and listed. Later passes, which act on what the
+   first one wrote, are listed too.
+3. **No file is deleted.** A few opt-in operations move files: merging a split
    show, setting a lossy duplicate aside, and setting aside a ZIP or SHN whose
    replacement is proven - both into `_etree_review/`, for you to empty. The
    only files ever removed are the tool's own unfinished output: a
    half-extracted ZIP's temporary folder, a FLAC that failed its check.
+   `jamp tidy` removes folders, and only those with nothing at all inside.
 4. **A date or an act is never guessed.** Below the confidence threshold a
    folder is reported and left alone, even under `--commit`.
 5. **Tags are backed up before they change**, to `.etree_backup.json`, which is
@@ -269,8 +274,10 @@ the `years` it was in each.
   holding one show looks exactly like a wrapper.
 - **A show nested inside another show is renamed first**, deepest first, so
   renaming the parent never moves the child out from under its own plan.
-- **Deleting is not part of the tool.** Emptied folders are left behind, and
-  clearing them is a separate step.
+- **Only an empty folder is ever removed.** Emptied folders are left behind by
+  whatever emptied them, and `jamp tidy` is the separate, explicit step that
+  clears them: nothing at all inside, checked again just before each goes, and
+  a folder holding files but no audio is only listed.
 
 ## 11. Tags and formats
 
@@ -329,10 +336,10 @@ every other kind of evidence**. It is reported wherever it is used.
 ## 13. The internet
 
 **Phases 0, 1 and 2 never touch the network**, so a plan is reproducible. Only
-phase 3 goes online, and it caches everything it asks.
+`lookup` goes online, and it caches everything it asks.
 
 - **Fill only.** A field with a value is never replaced - unless the value is
-  one phase 3 itself wrote, which it records in `.etree_state.json`.
+  one `lookup` itself wrote, which it records in `.etree_state.json`.
 - **Report first**, structurally: `--apply` refuses to run without the report.
 - **Durations decide which recording a folder holds**, not the words in its
   name. Where a source has track lengths, a title is written only when the
@@ -350,7 +357,7 @@ phase 3 goes online, and it caches everything it asks.
 - **Old answers stay good for longer.** This year's shows are refreshed after a
   week, earlier ones after a month.
 
-`jamp complete` reads the recordings from the other side: songs in the
+`jamp check` reads the recordings from the other side: songs in the
 setlist that nothing in the recording answers to. A shortfall counts only when
 the recording is a subset of the setlist; a reference shorter than the
 recording proves nothing; and without segue information a low track count is

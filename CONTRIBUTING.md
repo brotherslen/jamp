@@ -20,11 +20,11 @@ These are the invariants the design depends on. Each one was learned from a
 bug that broke it.
 
 1. **Nothing writes without `--commit`.** Phases 0 and 1, `acts`, `init`,
-   `doctor`, `complete` and a dry run of `restore`, `unpack` or `convert` have
+   `doctor`, `check` and a dry run of `restore`, `unpack`, `convert` or `tidy` have
    no code path that renames, moves, deletes or tags anything in the library.
    Keep it that way structurally, not by checking a flag deep inside.
 2. **One reader per container and field.** A second reader for the same thing
-   always ends up disagreeing with the first. Phase 3 once decided whether
+   always ends up disagreeing with the first. `lookup` (phase 3) once decided whether
    TITLE was empty with its own reader and saw no title on WAV; a later FLAC
    header reader forgot that an ID3 tag may precede `fLaC` and called intact
    files damaged. Use `audio.py`'s readers.
@@ -33,7 +33,7 @@ bug that broke it.
    through the name builders and parsers. A writer without one produces a
    folder that is rewritten on every run.
 4. **The tool's output is its next input.** Folder names and tags written by
-   phase 2 are read by phase 1 next time. Any change to naming or tagging must
+   `apply` (phase 2) are read by `plan` (phase 1) next time. Any change to naming or tagging must
    be checked for what a second pass makes of it: run `--reclassify` on a
    settled library and expect zero `PLAN`.
 5. **A silent skip is worse than an error.** Anything refused, unreadable or
@@ -52,7 +52,7 @@ bug that broke it.
 
 - **A fix comes with a test that fails without it.**
 - **Measure the blast radius.** For anything that changes analysis, naming or
-  tagging, run a whole-library `phase1 --reclassify` into a reports folder
+  tagging, run a whole-library `plan --reclassify` into a reports folder
   before the change and another after, and diff every report. Explain every
   line that differs. Several changes have been reverted on exactly this
   evidence.
@@ -67,7 +67,7 @@ bug that broke it.
 | `jamp/` | the package |
 | `jamp/data/` | shipped config: `jamp.yaml`, `venues.yaml`, `templates/` (what `init` writes), `examples/` |
 | `tests/` | pytest; `fixtures.py` builds test libraries |
-| `tools/` | maintenance scripts, run from a checkout; not installed |
+| `tools/` | maintenance scripts, run from a checkout; not installed. Nothing a user needs may live only here |
 | `docs/` | user documentation |
 | `packaging/` | the standalone build's entry point and readme |
 | `Dockerfile` | the container image |
@@ -79,6 +79,9 @@ bug that broke it.
 | `install.py` | `jamp init` and `jamp doctor` |
 | `acts.py` | `jamp acts` |
 | `restore.py` | `jamp restore` |
+| `tidy.py` | `jamp tidy`: removing only completely empty folders |
+| `distill.py` | the show database `check` and `--shows` read, from `lookup`'s cache |
+| `verify.py` | the resumable audio check behind `scan --verify-audio` |
 | `unpack.py`, `convert.py`, `batch.py` | `jamp unpack`, `jamp convert`, and what they share: scope, plan check, setting originals aside |
 | `userdir.py` | where the user folder is |
 | `config.py` | loading the config and laying the user's layers over the shipped one |
@@ -97,12 +100,12 @@ bug that broke it.
 | `sidecars.py` | rewriting `.ffp` / `.md5` / `.st5` / `.sfv` / `.cue` |
 | `dupes.py` | lossy copies beside lossless ones |
 | `integrity.py`, `identity.py` | FLAC STREAMINFO, decoding against the MD5, finding ffmpeg, which folders share audio |
-| `phase0.py`, `phase1.py`, `phase2.py` | the inventory, the plan, the writer |
+| `phase0.py`, `phase1.py`, `phase2.py` | `scan`, `plan` and `apply`: the inventory, the plan, the writer. The modules keep the phase names |
 | `tagwriter.py` | writing tags, and backing up and restoring them per container |
 | `state.py` | `.etree_state.json` |
 | `report.py` | CSV/JSON/text reports and the run lock |
 | `winpath.py`, `textio.py` | long Windows paths; encoding-tolerant text reading |
-| `confirm.py` | phase 3 |
+| `confirm.py` | `lookup` (phase 3) |
 | `archiveorg.py`, `phishin.py`, `phishnet.py`, `jerrybase.py`, `mmjarchive.py` | one reference source each |
 | `httpcache.py`, `showstore.py` | the HTTP cache and the distilled show database |
 | `setlist.py`, `complete.py` | duration alignment and the completeness check |

@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .audio import AUDIO_EXTS
-from .report import ensure_out_dir, run_lock, write_csv, write_json
+from .report import ensure_out_dir, report_file, run_lock, write_csv, write_json
 from .sidecars import REWRITE, NO_CHANGE, kind_for, plan_sidecar, propose_sidecar_name
 from .state import STATE_NAME, read_state
 from .tagwriter import BACKUP_NAME, _prepare_restore, read_all_tags
@@ -533,7 +533,7 @@ def run(args) -> int:
         lines.append("A restored folder is no longer settled: the next dry run will "
                      "propose renaming it again. To keep it as it is, add it to "
                      "overrides.yaml with skip: true.")
-        (out_dir / "restore_summary.txt").write_text("\n".join(lines) + "\n",
+        report_file(out_dir / "restore_summary.txt").write_text("\n".join(lines) + "\n",
                                                      encoding="utf-8")
         write_csv(out_dir / ("restore_committed.csv" if args.commit else "restore_steps.csv"),
                   ["status", "kind", "folder", "old", "new", "detail", "error"],

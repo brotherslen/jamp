@@ -250,8 +250,10 @@ def build_shows(
     cfg: Config,
     read_tags: bool = True,
     tag_sample: int = 0,
+    reads=None,
 ) -> ScanResult:
     root = root.resolve()
+    read = reads.read if reads is not None else read_audio_file
     result = ScanResult(root=root, dirs_scanned=len(dirs))
     audio_dirs = {p for p, d in dirs.items() if d.has_audio}
     consumed: set[Path] = set()
@@ -373,7 +375,7 @@ def build_shows(
         for i, ap in enumerate(sorted(audio_paths)):
             want_tags = read_tags and (not tag_sample or i in sample_idx)
             try:
-                af = read_audio_file(ap, read_tags=want_tags)
+                af = read(ap, read_tags=want_tags)
             except OSError as exc:
                 result.errors.append((str(ap), "%s: %s" % (exc.__class__.__name__, exc)))
                 continue
@@ -416,7 +418,9 @@ def scan(
     tag_sample: int = 0,
     max_depth: int | None = None,
     include_top: set[str] | None = None,
+    reads=None,
 ) -> ScanResult:
+    """Every show under ROOT.  `reads`, a reads.ReadCache, reuses file reads."""
     root_path = Path(root).resolve()
     if not root_path.is_dir():
         raise NotADirectoryError("ROOT is not a directory: %s" % root_path)
@@ -427,6 +431,7 @@ def scan(
                      include_top=include_top,
                      ignore=cfg.settings.ignore_folders,
                      errors=walk_errors)
-    result = build_shows(root_path, dirs, cfg, read_tags=read_tags, tag_sample=tag_sample)
+    result = build_shows(root_path, dirs, cfg, read_tags=read_tags, tag_sample=tag_sample,
+                         reads=reads)
     result.errors[:0] = walk_errors
     return result

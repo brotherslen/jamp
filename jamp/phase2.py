@@ -28,10 +28,12 @@ from pathlib import Path
 from .config import Config
 from .naming import parse_canonical, parse_release_show_name
 from .phase1 import (DUPLICATE, MERGE, PLAN, SKIP_BLOCKED, SPLIT_SHOW,
-                     UNCHANGED, ShowPlan, build_plans)
+                     UNCHANGED, ShowPlan, build_plans, plan_differences,
+                     show_record)
+from .reads import ReadCache
 from .state import is_settled
 from .winpath import opener
-from .report import TextReport, ensure_out_dir, run_lock, write_json
+from .report import TextReport, ensure_out_dir, report_file, run_lock, write_json
 from .state import write_state  # noqa: F401  (is_settled imported above)
 from .tagwriter import BACKUP_NAME, write_backup, write_tags
 
@@ -438,7 +440,7 @@ class CommitLog:
     def __init__(self, path: Path):
         import csv
 
-        self._fh = open(path, "w", newline="", encoding="utf-8-sig")
+        self._fh = open(report_file(path), "w", newline="", encoding="utf-8-sig")
         self._writer = csv.writer(self._fh)
         self._writer.writerow(self.HEADER)
         self._fh.flush()
@@ -554,9 +556,26 @@ def run(
     overrides=None,
     until_settled: bool = False,
     max_passes: int = 5,
+    check_plan: bool = False,
 ) -> dict:
+    """Carry out the plan.
+
+    `check_plan` holds a commit to the dry run in `out_dir`: on the first pass
+    a folder is committed only if its plan is what phase1_plan.json showed and
+    its files are as they were then.  The CLI sets it unless --skip-plan-check.
+    """
     out_dir = ensure_out_dir(out_dir, root)
     with run_lock(out_dir, "phase2"):
+        # What the dry run read, reused for every file unchanged since - the
+        # reads, not the answers; the analysis runs again on them.
+        reads, _ = ReadCache.load(out_dir)
+        read_before = len(reads)
+        dry_run = None
+        if commit and check_plan and not (settle or quarantine_lossy):
+            dry_run = _dry_run_records(out_dir)
+        refused: list[FolderWork] = []
+        beyond: list[FolderWork] = []
+        dropped: list[str] = []
         # Committing changes the evidence the next read sees - a folder can
         # only be named correctly once the thing it was nested in has moved,
         # and a venue can only be derived once the tags carry it.  So the
@@ -575,7 +594,13 @@ def run(
             while True:
                 passes += 1
                 plans = build_plans(root, cfg, today=today, reclassify=reclassify,
-                                    include_top=include_top, overrides=overrides)
+                                    include_top=include_top, overrides=overrides,
+                                    reads=reads)
+                if passes == 1:
+                    # What the run set out to do.  The last pass's plans are what
+                    # was left, and reporting those as the scope read "0 PLAN" on
+                    # a commit that had just renamed a folder.
+                    first_plans = plans
                 if quarantine_lossy:
                     works = [quarantine_actions(p, cfg, Path(root)) for p in plans if p.lossy]
                 elif settle:
@@ -586,10 +611,35 @@ def run(
                     works = [plan_actions(p, cfg, include_merges, unnest=unnest)
                              for p in chosen]
 
+                # Held to the dry run before anything moves, so no folder's
+                # record is taken after an earlier folder in this pass changed
+                # what is on disk.
+                differs: dict[int, str] = {}
+                if dry_run is not None and passes == 1:
+                    for i, work in enumerate(works):
+                        then = dry_run.get(str(work.folder))
+                        why = (["it was not in the dry run"] if then is None
+                               else plan_differences(show_record(work.plan), then))
+                        if why:
+                            differs[i] = ("differs from the dry run, run jamp plan again "
+                                          "to see it: " + "; ".join(why))
+                    # The other way round: shown as work in the dry run, and not
+                    # work now.  Nothing is written to them, but saying nothing
+                    # would read as though they had been done.
+                    chosen_now = {str(w.folder) for w in works}
+                    wanted = {PLAN, MERGE} if include_merges else {PLAN}
+                    dropped = sorted(path for path, rec in dry_run.items()
+                                     if rec.get("status") in wanted
+                                     and path not in chosen_now
+                                     and path not in failed_before)
+
                 failed_targets: set[str] = set()
-                for work in works:
+                for i, work in enumerate(works):
                     try:
-                        blocked = primary_failed(work, failed_targets) if commit else None
+                        blocked = ((differs.get(i) or primary_failed(work, failed_targets))
+                                   if commit else None)
+                        if i in differs:
+                            refused.append(work)
                         if not commit:
                             work.status = PLANNED
                         elif blocked:
@@ -608,6 +658,11 @@ def run(
                             and work.plan.merge_role == "primary"):
                         failed_targets.add(str(work.plan.merge_target))
                 failed_before.update(str(w.folder) for w in works if w.status == FAILED)
+                if passes > 1:
+                    # Settling goes on past what the dry run showed - a venue
+                    # the first pass's tags made derivable, say.  Named, so it
+                    # can be read, and put back with jamp restore if wrong.
+                    beyond.extend(w for w in works if w.status == DONE)
 
                 if not looping:
                     break
@@ -618,13 +673,19 @@ def run(
                 if not works or done == 0 or passes >= max_passes:
                     break
 
-        stats = _write_reports(out_dir, plans, all_works, cfg, commit, include_merges)
+        stats = _write_reports(out_dir, first_plans, all_works, cfg, commit, include_merges,
+                               refused=refused, beyond=beyond, dropped=dropped,
+                               plan_checked=dry_run is not None)
         stats["passes"] = passes
+        stats["refused_by_plan"] = len(refused)
+        stats["planned_not_offered"] = len(dropped)
+        stats["beyond_dry_run"] = len(beyond)
         if commit:
             # Say plainly whether there is anything left, so finding out does
             # not need a separate phase 1 run.
             after = build_plans(root, cfg, today=today, reclassify=True,
-                                include_top=include_top, overrides=overrides)
+                                include_top=include_top, overrides=overrides,
+                                reads=reads)
             stats["remaining"] = len(eligible_plans(after, include_merges, unnest=unnest))
             # "Nothing left to do" is not "everything got renamed".  Folders
             # blocked on a date conflict, waiting on a duplicate decision, or
@@ -635,11 +696,31 @@ def run(
                 if p_.status in (SKIP_BLOCKED, DUPLICATE, MERGE, SPLIT_SHOW):
                     held[p_.status] = held.get(p_.status, 0) + 1
             stats["held"] = held
+        stats["reads_reused"] = reads.hits
+        stats["reads_saved"] = read_before
+        stats["files_read"] = reads.misses
         return stats
 
 
+def _dry_run_records(out_dir: Path) -> dict[str, dict]:
+    """The dry run's record of each show, by path.
+
+    The CLI has already refused a commit without a current plan; a plan that
+    cannot be read here refuses every folder rather than none.
+    """
+    import json
+
+    try:
+        data = json.loads((Path(out_dir) / "phase1_plan.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {rec["path"]: rec for rec in data.get("shows", [])}
+
+
 def _write_reports(out_dir: Path, plans, works: list[FolderWork], cfg: Config,
-                   commit: bool, include_merges: bool) -> dict:
+                   commit: bool, include_merges: bool,
+                   refused: list[FolderWork] = (), beyond: list[FolderWork] = (),
+                   dropped: list[str] = (), plan_checked: bool = False) -> dict:
     counts = {
         "folders_selected": len(works),
         "folders_done": sum(1 for w in works if w.status == DONE),
@@ -684,6 +765,8 @@ def _write_reports(out_dir: Path, plans, works: list[FolderWork], cfg: Config,
     rep.kv("folders selected", counts["folders_selected"])
     rep.kv("actions", counts["actions"])
     if commit:
+        rep.kv("held to the dry run", "yes, on the first pass" if plan_checked
+               else "no (--skip-plan-check)")
         rep.kv("folders completed", counts["folders_done"])
         rep.kv("folders failed and rolled back", counts["folders_failed"])
 
@@ -694,7 +777,32 @@ def _write_reports(out_dir: Path, plans, works: list[FolderWork], cfg: Config,
     rep.heading("Actions by kind")
     rep.histogram(kinds, width=20)
 
-    failures = [w for w in works if w.status == FAILED]
+    if refused:
+        rep.heading("Not committed - different from the dry run (%d)" % len(refused))
+        rep.line("  Each would have done something phase1_summary.txt did not show, or")
+        rep.line("  its files changed after the dry run.  Nothing was written to them.")
+        rep.line("  Run jamp plan again into this folder, read it, and commit again.")
+        for w in refused:
+            rep.line("  %s" % w.plan.show.rel)
+            rep.line("      %s" % (w.error or "")[:300])
+    if dropped:
+        rep.heading("In the dry run's plan, and no longer work (%d)" % len(dropped))
+        rep.line("  The dry run would have changed these; this commit does not see")
+        rep.line("  anything to do in them, and left them as they are.  Run phase 1")
+        rep.line("  again to see why.")
+        for path in dropped:
+            rep.line("  %s" % path)
+    if beyond:
+        rep.heading("Committed by a later pass, beyond the dry run (%d)" % len(beyond))
+        rep.line("  The first pass changed what these folders' files say, and the next")
+        rep.line("  pass acted on it.  No dry run showed these; check them, and put any")
+        rep.line("  back with jamp restore.  --one-pass stops after the first pass.")
+        for w in beyond:
+            rep.line("  %s" % w.plan.show.rel)
+            rep.line("      -> %s" % (w.plan.new_folder_name or w.plan.show.name))
+
+    refused_ids = {id(w) for w in refused}
+    failures = [w for w in works if w.status == FAILED and id(w) not in refused_ids]
     if failures:
         rep.heading("Folders that failed and were rolled back (%d)" % len(failures))
         for w in failures:

@@ -17,6 +17,56 @@ from pathlib import Path
 
 
 LOCK_NAME = ".jamp_run.lock"
+HISTORY_NAME = "history"
+
+# Kept where they are rather than put in history: a ledger and a log that are
+# appended to, and a cache of reads that is only ever worth its newest copy.
+NEVER_ARCHIVED = frozenset({"verify_audio_ledger.csv", "convert_committed.csv",
+                            "phase1_reads.json.gz", LOCK_NAME})
+
+# The run holding the lock in this process: its reports folder, when it started,
+# what it is, and the reports it has written so far.
+_run: dict | None = None
+
+
+def report_file(path: Path) -> Path:
+    """`path`, after moving an earlier run's file of that name into history.
+
+    Every run used to replace the reports of the run before it, and the one
+    lost was always the one needed: phase2_committed.csv - the reversal log - was
+    overwritten by the next dry run into the same folder, and so was a tag
+    survey.  Now whatever a run is about to replace goes first to
+    history/<when this run started> <what it is>/ in the same reports folder.
+    The newest reports stay exactly where they always were, so nothing that
+    reads them (the commit check, check, restore --log) needs to change.
+
+    Only inside a run that holds the reports folder's lock, only for a file
+    directly in that folder, and only once per file per run - a run rewriting its
+    own report (a summary saved twice) is not replacing anyone's.
+    """
+    path = Path(path)
+    run = _run
+    if run is None or path.parent.resolve() != run["out_dir"]:
+        return path
+    key = str(path.resolve()).lower()
+    if key in run["written"]:
+        return path
+    run["written"].add(key)
+    if path.name in NEVER_ARCHIVED or not path.is_file():
+        return path
+    dest_dir = run.get("history_dir")
+    if dest_dir is None:
+        # Chosen on first use and kept: two runs of one command in the same
+        # second must not share a folder and overwrite each other's history.
+        base = run["out_dir"] / HISTORY_NAME / ("%s %s" % (run["stamp"], run["what"]))
+        dest_dir, n = base, 1
+        while dest_dir.exists():
+            n += 1
+            dest_dir = base.with_name("%s (%d)" % (base.name, n))
+        dest_dir.mkdir(parents=True)
+        run["history_dir"] = dest_dir
+    os.replace(path, dest_dir / path.name)
+    return path
 # Long enough that a slow library scan never trips it, short enough that a lock
 # left behind by a killed run does not block work for the rest of the day.
 LOCK_STALE_AFTER = _dt.timedelta(hours=2)
@@ -65,9 +115,15 @@ def run_lock(out_dir: Path, what: str = "a run"):
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(mine)
         break
+    global _run
+    outer = _run
+    _run = {"out_dir": Path(out_dir).resolve(), "what": what,
+            "stamp": _dt.datetime.now().strftime("%Y-%m-%dT%H-%M-%S"),
+            "written": set()}
     try:
         yield
     finally:
+        _run = outer
         # Only our own lock.  If ours was taken over as stale while we ran,
         # the lock there now belongs to the run that is still writing.
         try:
@@ -137,7 +193,7 @@ def ensure_out_dir(out_dir: Path, root: Path) -> Path:
 
 def write_csv(path: Path, header: list[str], rows) -> int:
     count = 0
-    with open(path, "w", newline="", encoding="utf-8-sig") as fh:
+    with open(report_file(path), "w", newline="", encoding="utf-8-sig") as fh:
         writer = csv.writer(fh)
         writer.writerow(header)
         for row in rows:
@@ -157,7 +213,8 @@ def _default(obj):
 
 
 def write_json(path: Path, data) -> None:
-    path.write_text(json.dumps(data, indent=2, default=_default), encoding="utf-8")
+    report_file(path).write_text(json.dumps(data, indent=2, default=_default),
+                                 encoding="utf-8")
 
 
 @dataclass
@@ -196,5 +253,5 @@ class TextReport:
         return "\n".join(head + self.lines) + "\n"
 
     def save(self, path: Path) -> Path:
-        path.write_text(self.render(), encoding="utf-8")
+        report_file(path).write_text(self.render(), encoding="utf-8")
         return path

@@ -57,6 +57,7 @@ from pathlib import Path
 from . import (archiveorg, dates as _dates, jerrybase, mmjarchive, phishin,
                phishnet, setlist)
 from .httpcache import HttpCache
+from .report import report_file
 from .winpath import opener
 
 SHNID = "SHNID"
@@ -1159,7 +1160,7 @@ def _write_report(out_dir, proposals, downloads, stats, cache, folder_count):
                 L.append("      https://archive.org/details/%s" % r.identifier)
         else:
             L.append("      archive.org has nothing for this band and date")
-    (out_dir / "phase3_summary.txt").write_text("\n".join(L) + "\n", encoding="utf-8")
+    report_file(out_dir / "phase3_summary.txt").write_text("\n".join(L) + "\n", encoding="utf-8")
 
 
 def _write_proposals(out_dir, proposals):
@@ -1178,7 +1179,7 @@ def _write_proposals(out_dir, proposals):
                          if p.tier in COUNT_MATCHED else "duration alignment"),
             "needs_a_human": p.needs_a_human, "notes": p.notes,
         })
-    (out_dir / "phase3_proposals.json").write_text(
+    report_file(out_dir / "phase3_proposals.json").write_text(
         json.dumps(payload, indent=1, ensure_ascii=False), encoding="utf-8")
 
 

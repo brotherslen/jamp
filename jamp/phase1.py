@@ -42,6 +42,7 @@ from .naming import (
     strip_audio_spec,
     strip_trailing_source,
 )
+from .reads import ReadCache, folder_fingerprint
 from .report import TextReport, ensure_out_dir, run_lock, write_csv, write_json
 from .scan import scan
 from .sidecars import plan_sidecar, propose_sidecar_name
@@ -1143,8 +1144,10 @@ def build_plans(root: Path, cfg: Config, today: _dt.date | None = None,
                 reclassify: bool = False,
                 include_top: set[str] | None = None,
                 overrides=None,
-                scan_errors: list | None = None) -> list[ShowPlan]:
-    result = scan(root, cfg, read_tags=True, tag_sample=0, include_top=include_top)
+                scan_errors: list | None = None,
+                reads=None) -> list[ShowPlan]:
+    result = scan(root, cfg, read_tags=True, tag_sample=0, include_top=include_top,
+                  reads=reads)
     if scan_errors is not None:
         scan_errors.extend(result.errors)
     analyses = [analyze_show(show, cfg, today=today, overrides=overrides)
@@ -1166,7 +1169,7 @@ def build_plans(root: Path, cfg: Config, today: _dt.date | None = None,
         if p.lossy:
             p.warnings.append(
                 "%d MP3 file(s) duplicate a lossless copy: %s. Move them aside with "
-                "phase2 --quarantine-lossy"
+                "jamp apply --quarantine-lossy"
                 % (len(p.lossy.files), p.lossy.reason)
             )
     return plans
@@ -1174,22 +1177,189 @@ def build_plans(root: Path, cfg: Config, today: _dt.date | None = None,
 
 def run(root: Path, out_dir: Path, cfg: Config, today: _dt.date | None = None,
         reclassify: bool = False, include_top: set[str] | None = None,
-        overrides=None) -> dict:
+        overrides=None, unnest: bool = False,
+        settings: dict[str, str] | None = None) -> dict:
     # Guard here as well as in the CLI, so no caller can drop reports into the
     # library by going around the front door.
     out_dir = ensure_out_dir(out_dir, root)
     with run_lock(out_dir, "phase1"):
         errors: list[tuple[str, str]] = []
+        # Kept for the commit that follows, which then reads again only what
+        # has changed since - see reads.py.
+        reads = ReadCache()
         plans = build_plans(root, cfg, today=today, reclassify=reclassify,
                             include_top=include_top, overrides=overrides,
-                            scan_errors=errors)
-        return _write_reports(out_dir, plans, cfg, scan_errors=errors,
-                              root=root, scope=include_top)
+                            scan_errors=errors, reads=reads)
+        # Which folders hold the same audio, from the reads the plan already
+        # made - so check needs no separate scan, and its paths are the
+        # library's as it is now rather than as some earlier scan found it.
+        from . import identity as _identity
+
+        shows = [p.show for p in plans]
+        _index, matches, repeats, _stats = _identity.write_reports(out_dir, shows, "phase1")
+        counts = _write_reports(out_dir, plans, cfg, scan_errors=errors,
+                                root=root, scope=include_top,
+                                reclassify=reclassify, unnest=unnest,
+                                settings=settings, identity=(matches, repeats))
+        reads.save(out_dir)
+        return counts
+
+
+def _report_lifts(rep, plans: list[ShowPlan]) -> None:
+    """What --unnest would do, so a commit with it has a plan to be read.
+
+    It used to be phase 2's flag alone: the first anyone saw of a lift was the
+    folder having moved.  Two shows lifted onto one name, or onto a folder
+    already there, are named here too - phase 2 would refuse them.
+    """
+    from .phase2 import eligible_plans, lift_target
+
+    lifts, refused = [], []
+    for p in eligible_plans(plans, include_merges=False, unnest=True):
+        parent, why = lift_target(p)
+        if parent is not None:
+            lifts.append((p, parent / (p.new_folder_name or p.show.path.name), why))
+        elif why:
+            refused.append((p, why))
+    rep.heading("Lifted out of their folder by --unnest (%d)" % len(lifts))
+    rep.line("  A lift moves a whole show up a level; the folder it leaves stays.")
+    seen: dict[str, int] = defaultdict(int)
+    for _, target, _ in lifts:
+        seen[str(target).lower()] += 1
+    for p, target, why in lifts:
+        rep.line("  %s" % p.show.rel)
+        try:
+            rep.line("      -> %s" % target.relative_to(p.show.root))
+        except ValueError:
+            rep.line("      -> %s" % target)
+        if seen[str(target).lower()] > 1:
+            rep.line("      WILL NOT MOVE: another show would be lifted onto the same name")
+        elif target.exists() and str(target).lower() != str(p.show.path).lower():
+            rep.line("      WILL NOT MOVE: %s already exists" % target.name)
+    if refused:
+        rep.heading("Not lifted (%d)" % len(refused))
+        for p, why in refused:
+            rep.line("  %s" % p.show.rel)
+            rep.line("      %s" % why[:120])
+
+
+PLAN_FORMAT = 2
+
+
+def show_record(p: ShowPlan) -> dict:
+    """One show as phase1_plan.json records it.
+
+    Phase 2 builds the same record for the plan it is about to commit and
+    compares the two, so this is the only writer of it and there is no second
+    description of a plan to drift from the first.
+    """
+    import hashlib
+
+    return {
+        "path": str(p.show.path),
+        # Every file the analysis read, as it was: a commit takes a folder
+        # only if this still matches.
+        "fingerprint": folder_fingerprint(p.show),
+        "status": p.status,
+        "current_folder": p.old_folder_name,
+        "proposed_folder": p.new_folder_name,
+        "merge_into": str(p.merge_target) if p.merge_target else None,
+        "merge_role": p.merge_role or None,
+        "merge_with": p.merge_with,
+        # Where --unnest would lift from.
+        "container": str(p.show.container) if p.show.container else None,
+        "filing_parent": str(p.show.filing_parent) if p.show.filing_parent else None,
+        "band": p.analysis.band.abbrev,
+        "date": p.analysis.date.iso,
+        "date_confidence": p.analysis.date.confidence,
+        "date_reasons": p.analysis.date.reasons,
+        "classification": p.analysis.classification.kind,
+        "shape": p.analysis.classification.shape,
+        "source": p.analysis.source.value,
+        "source_inferred": p.analysis.source.inferred,
+        "source_reason": p.analysis.source.reason,
+        "provenance": p.analysis.provenance,
+        "format": p.analysis.fmt,
+        "reasons": p.reasons,
+        "warnings": p.warnings,
+        "issues": [{"code": i.code, "severity": i.severity, "detail": i.detail}
+                   for i in p.analysis.issues],
+        "tracks": [
+            {
+                "current": t.old_name, "proposed": t.new_name,
+                "kind": t.kind, "number": t.number, "track": t.track,
+                "numbering_source": t.numbering_source,
+                "title": t.title, "title_source": t.title_source,
+                "tags": {k: {"current": c, "proposed": n}
+                         for k, (c, n) in t.tags.items()},
+                "warnings": t.warnings,
+            }
+            for t in p.tracks
+        ],
+        "sidecars": [
+            {"file": s.path.name, "kind": s.kind, "status": s.status,
+             "proposed_name": s.new_name, "entries": len(s.referenced),
+             "unresolved": s.unresolved, "notes": s.notes,
+             "new_text_sha1": (hashlib.sha1(s.new_text.encode("utf-8")).hexdigest()
+                               if s.new_text is not None else None)}
+            for s in p.sidecars
+        ],
+    }
+
+
+# What a commit does with a folder.  Reasons, warnings and issue text explain a
+# plan; they do not change what is written, so they are not compared.
+_COMMIT_FIELDS = ("status", "current_folder", "proposed_folder", "merge_into",
+                  "merge_role", "container", "filing_parent", "band", "date",
+                  "date_confidence", "classification", "shape", "source",
+                  "source_inferred", "provenance", "format")
+
+
+def plan_differences(now: dict, then: dict) -> list[str]:
+    """How the plan a commit is about to carry out differs from the dry run's.
+
+    Empty when the commit would do exactly what the dry run showed.  Both
+    records are compared as JSON, the form the dry run's was read back in.
+    """
+    import json
+
+    now = json.loads(json.dumps(now, default=str))
+    out = []
+    if now.get("fingerprint") != then.get("fingerprint"):
+        out.append("its files changed on disk after the dry run")
+    for key in _COMMIT_FIELDS:
+        if now.get(key) != then.get(key):
+            out.append("%s was %r in the dry run and is now %r"
+                       % (key, then.get(key), now.get(key)))
+
+    def tracks(rec):
+        return [(t["current"], t["proposed"],
+                 {k: v["proposed"] for k, v in t["tags"].items()})
+                for t in rec.get("tracks", [])]
+
+    def sidecars(rec):
+        return [(s["file"], s["status"], s["proposed_name"], s.get("new_text_sha1"))
+                for s in rec.get("sidecars", [])]
+
+    old_t, new_t = tracks(then), tracks(now)
+    if old_t != new_t:
+        changed = [n[0] for o, n in zip(old_t, new_t) if o != n]
+        if len(old_t) != len(new_t):
+            out.append("%d tracks in the dry run, %d now" % (len(old_t), len(new_t)))
+        else:
+            out.append("different track names or tags for %d file(s), first %s"
+                       % (len(changed), changed[0]))
+    if sidecars(then) != sidecars(now):
+        out.append("a checksum or cue file would be handled differently")
+    return out
 
 
 def _write_reports(out_dir: Path, plans: list[ShowPlan], cfg: Config,
                    scan_errors: list | None = None, root: Path | None = None,
-                   scope: set[str] | None = None) -> dict:
+                   scope: set[str] | None = None, reclassify: bool = False,
+                   unnest: bool = False,
+                   settings: dict[str, str] | None = None,
+                   identity: tuple | None = None) -> dict:
     counts: dict[str, int] = defaultdict(int)
     for p in plans:
         counts[p.status] += 1
@@ -1284,53 +1454,21 @@ def _write_reports(out_dir: Path, plans: list[ShowPlan], cfg: Config,
             # the same scope was made before it commits.
             "root": str(Path(root).resolve()) if root else None,
             "scope": sorted(scope) if scope else None,
+            # The options that change what a commit does.  A commit is refused
+            # unless it asks for the same ones, so what it does is what was
+            # read: a dry run without --reclassify leaves settled folders out
+            # of the plan, and a commit with it would rename them unseen.
+            "reclassify": bool(reclassify),
+            "unnest": bool(unnest),
+            # Each settings file and a digest of it: a commit made with other
+            # settings - or none, in a window that cannot see them - is refused.
+            "settings": settings or {},
             "commit_threshold": cfg.settings.min_date_confidence_commit,
+            # 2: each show carries the fingerprint and the commit-relevant
+            # fields phase 2 checks it against before committing it.
+            "plan_format": PLAN_FORMAT,
             "counts": dict(counts),
-            "shows": [
-                {
-                    "path": str(p.show.path),
-                    "status": p.status,
-                    "current_folder": p.old_folder_name,
-                    "proposed_folder": p.new_folder_name,
-                    "merge_into": str(p.merge_target) if p.merge_target else None,
-                    "merge_role": p.merge_role or None,
-                    "merge_with": p.merge_with,
-                    "band": p.analysis.band.abbrev,
-                    "date": p.analysis.date.iso,
-                    "date_confidence": p.analysis.date.confidence,
-                    "date_reasons": p.analysis.date.reasons,
-                    "classification": p.analysis.classification.kind,
-                    "shape": p.analysis.classification.shape,
-                    "source": p.analysis.source.value,
-                    "source_inferred": p.analysis.source.inferred,
-                    "source_reason": p.analysis.source.reason,
-                    "provenance": p.analysis.provenance,
-                    "format": p.analysis.fmt,
-                    "reasons": p.reasons,
-                    "warnings": p.warnings,
-                    "issues": [{"code": i.code, "severity": i.severity, "detail": i.detail}
-                               for i in p.analysis.issues],
-                    "tracks": [
-                        {
-                            "current": t.old_name, "proposed": t.new_name,
-                            "kind": t.kind, "number": t.number, "track": t.track,
-                            "numbering_source": t.numbering_source,
-                            "title": t.title, "title_source": t.title_source,
-                            "tags": {k: {"current": c, "proposed": n}
-                                     for k, (c, n) in t.tags.items()},
-                            "warnings": t.warnings,
-                        }
-                        for t in p.tracks
-                    ],
-                    "sidecars": [
-                        {"file": s.path.name, "kind": s.kind, "status": s.status,
-                         "proposed_name": s.new_name, "entries": len(s.referenced),
-                         "unresolved": s.unresolved, "notes": s.notes}
-                        for s in p.sidecars
-                    ],
-                }
-                for p in plans
-            ],
+            "shows": [show_record(p) for p in plans],
         },
     )
 
@@ -1363,6 +1501,9 @@ def _write_reports(out_dir: Path, plans: list[ShowPlan], cfg: Config,
                          % (p.old_folder_name[:44], len(p.tracks), first.kind if first else "?",
                             first.number if first else 0,
                             "  (%s)" % p.merge_role if p.merge_role else ""))
+
+    if unnest:
+        _report_lifts(rep, plans)
 
     for status, heading in ((DUPLICATE, "Duplicates - same show twice, delete one"),
                             (SPLIT_SHOW, "Split shows reported, not merged"),
@@ -1413,6 +1554,13 @@ def _write_reports(out_dir: Path, plans: list[ShowPlan], cfg: Config,
         for path, error in scan_errors[:40]:
             rep.line("  %s" % path)
             rep.line("      %s" % error[:120])
+
+    if identity is not None:
+        from . import identity as _identity
+
+        # Last: it is about the library, not about what this plan will do, and
+        # a same-name DUPLICATE above is often settled by reading it.
+        _identity.report_matches(rep, identity[0], identity[1], "phase1_same_audio.csv")
 
     rep.save(out_dir / "phase1_summary.txt")
     return dict(counts)

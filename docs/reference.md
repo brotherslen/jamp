@@ -15,7 +15,7 @@ Every command, flag, file and code. For how to use them together, read
 - [Plan outcomes](#plan-outcomes)
 - [Issue codes](#issue-codes)
 - [The naming scheme](#the-naming-scheme)
-- [jamp complete](#jamp-complete)
+- [jamp check](#jamp-check)
 - [Tools](#tools)
 
 ---
@@ -29,19 +29,27 @@ Every command, flag, file and code. For how to use them together, read
 | `jamp acts` | lists the top-level folders and the act each is; adds acts and ignored folders to `acts.yaml` | never |
 | `jamp unpack` | extracts ZIP files beside themselves, each file checked against the ZIP's CRC | only with `--commit` |
 | `jamp convert` | converts SHN to FLAC with ffmpeg, each file proven to decode to identical audio | only with `--commit` |
-| `jamp phase0` | inventory: formats, naming patterns, acts, dates, origin, sidecars, audio fingerprints | never |
-| `jamp phase1` | the plan: every folder's proposed name, track names, tags and sidecar rewrites, and every folder left alone with the reason | never |
-| `jamp phase2` | carries out the plan | only with `--commit` |
-| `jamp phase3` | asks reference sites for missing venues and titles; a report | only with `--apply --commit` |
-| `jamp complete` | compares recordings against setlists to find missing songs | never |
+| `jamp scan` | inventory: formats, naming patterns, acts, dates, origin, sidecars, audio fingerprints | never |
+| `jamp plan` | the plan: every folder's proposed name, track names, tags and sidecar rewrites, and every folder left alone with the reason | never |
+| `jamp apply` | carries out the plan | only with `--commit` |
+| `jamp lookup` | asks reference sites for missing venues and titles; a report | only with `--apply --commit` |
+| `jamp check` | compares recordings against setlists to find missing songs | never |
 | `jamp restore` | puts committed folders back as they were: tags, track names, checksum files, folder name | only with `--commit` |
+| `jamp tidy` | removes folders with nothing at all in them; lists folders with files but no audio | only with `--commit`, and only empty folders |
+
+**Older names.** Five commands were called by the step they are in, and still
+answer to it: `phase0` is `scan`, `phase1` is `plan`, `phase2` is `apply`,
+`phase3` is `lookup` and `complete` is `check`. A dry run made with one name
+can be committed with the other. Their reports keep the old names
+(`phase1_plan.json`, `phase2_committed.csv`), so a reports folder from before
+the change still works.
 
 `jamp --version` prints the version. `py -m jamp ...` (or `python -m jamp`)
 runs the same commands from a copy of the code.
 
 ## Flags
 
-**Every phase** (`phase0`, `phase1`, `phase2`, `phase3`, `complete`):
+**`scan`, `plan`, `apply`, `lookup` and `check`**, whichever name is typed:
 
 | flag | |
 | --- | --- |
@@ -55,40 +63,41 @@ runs the same commands from a copy of the code.
 
 A path given on the command line always beats a remembered one.
 
-**`phase0`**
+**`scan`**
 
 | flag | |
 | --- | --- |
-| `--verify-audio` | decode every FLAC and check it against its stored MD5. Optional; hours on a large library |
+| `--verify-audio` | decode every FLAC and check it against its stored MD5. Optional; hours on a large library. Resumes from `verify_audio_ledger.csv` in `--out-dir` |
 | `--workers N` | parallel decodes for `--verify-audio` (default 4) |
 | `--tag-sample N` | read tags from at most N files per folder (0 = all) |
 
-**`phase1` and `phase2`**
+**`plan` and `apply`**
 
 | flag | |
 | --- | --- |
-| `--reclassify` | reconsider folders already settled, ignoring `.etree_state.json` |
+| `--reclassify` | reconsider folders already settled, ignoring `.etree_state.json`. A commit needs it exactly when its dry run had it |
+| `--unnest` | lift shows out of wrapper folders; in `plan` it lists every lift. A commit needs it exactly when its dry run had it |
 
-**`phase2`**
+**`apply`**
 
 | flag | |
 | --- | --- |
-| `--commit` | actually write. Refused without a matching phase 1 plan in `--out-dir` |
-| `--until-settled` | keep committing until a pass changes nothing |
-| `--skip-plan-check` | commit without a matching phase 1 plan |
+| `--commit` | actually write, pass after pass until nothing changes. Refused without a plan in `--out-dir` for the same library, `--artist`, `--reclassify` and `--unnest`, made with the same config, acts, venues and overrides files. On the first pass a folder is left alone if its plan is no longer the one in `phase1_plan.json` or its files changed after the dry run; folders committed by a later pass are listed in `phase2_summary.txt` |
+| `--one-pass` | commit a single pass only |
+| `--until-settled` | the default; accepted for older commands |
+| `--skip-plan-check` | commit without a matching plan, and without holding each folder to it |
 | `--include-merges` | merge shows split across sibling folders; moves files between folders |
-| `--unnest` | lift a show out of a wrapper folder that holds nothing else; never to the top of the library |
 | `--quarantine-lossy` | move an MP3 copy that duplicates a lossless one into the review folder |
 | `--settle` | rename nothing; record folders already named in this scheme as settled |
 
-**`phase3`**
+**`lookup`**
 
 | flag | |
 | --- | --- |
 | `--apply` | write the tags in `phase3_proposals.json`; refused if that report is not in `--out-dir` |
 | `--commit` | with `--apply`: actually write (without it, `phase3_dry_run.csv`) |
 | `--offline` | answer only from the cache; never connect |
-| `--seed` | fetch what every source knows about every settled folder, and stop |
+| `--seed` | fetch what every source knows about every settled folder, write `shows.sqlite` beside the cache, and stop |
 | `--cache FILE` | the cache of everything fetched (default: `archive.sqlite` in your cache folder, or one already in `<out-dir>/cache/`) |
 | `--shows FILE` | a distilled show database, read before the network |
 | `--phishnet-key FILE` | a file holding a phish.net API key |
@@ -137,6 +146,15 @@ does not decode, or ffmpeg failed). Exit code 1 when anything is `MISMATCH` or
 | `--log FILE` | a `phase2_committed.csv` to follow renames through; repeat for several |
 | `--partial` | restore a folder even when some of its files cannot be matched; those are left as they are |
 
+**`tidy`**
+
+| flag | |
+| --- | --- |
+| `ROOT`, `--out-dir DIR` | default: remembered |
+| `--artist FOLDER` | only inside this folder (never removed itself); repeat for several |
+| `--commit` | actually remove. Refused without a dry run of the same scope in `--out-dir` |
+| `--skip-plan-check` | commit without that dry run |
+
 **`init`**
 
 | flag | |
@@ -171,14 +189,14 @@ does not decode, or ffmpeg failed). Exit code 1 when anything is `MISMATCH` or
 | `venues.yaml` | you | rooms added to the shipped gazetteer |
 | `paths.json` | `init`, `--remember` | remembered paths |
 
-**The cache folder** holds what phase 3 has downloaded, and can be deleted at
+**The cache folder** holds what `lookup` has downloaded, and can be deleted at
 any time: `%LOCALAPPDATA%\jamp\cache` on Windows, `~/Library/Caches/jamp` on
 macOS, `$XDG_CACHE_HOME/jamp` or `~/.cache/jamp` on Linux.
 
 **File formats.** `.etree_state.json` and `.etree_backup.json` carry an `etree_format`
 number (a file without one is format 1). A version of jamp never reads or
 rewrites a file with a higher number than it knows: the folder is blocked
-(`WRITTEN_BY_NEWER_VERSION`), phase 3 skips it, and `restore` refuses it.
+(`WRITTEN_BY_NEWER_VERSION`), `lookup` skips it, and `restore` refuses it.
 
 The config a run uses is: the shipped `jamp.yaml` → your `acts.yaml` → your
 `jamp.yaml`. Every run prints the files it read.
@@ -208,7 +226,7 @@ Anything in it is laid over the shipped config:
 | `min_date_confidence_plan` | `25` | below this a folder is not even planned |
 | `earliest_show_date` | `1960-01-01` | an earlier date is not believed |
 | `max_path_length` | `260` | path length flagged as too long |
-| `phase0_tag_sample` | `4` | files per folder whose tags phase 0 reads |
+| `phase0_tag_sample` | `4` | files per folder whose tags `scan` reads |
 | `rename_attempts`, `rename_retry_delay` | `5`, `0.15` | retries when a rename is briefly locked (antivirus, indexing) |
 | `unknown_defaults_to_unofficial` | `true` | treat a folder that names no series and no store as unofficial |
 | `classify_min_score`, `classify_min_margin` | `30`, `15` | how decisive official/unofficial evidence must be |
@@ -290,7 +308,7 @@ A name shared by two rooms is never guessed between: the show needs a city.
 
 ## What the tool writes inside the library
 
-Only `--commit` runs of `phase2`, `phase3 --apply`, `unpack`, `convert` and `restore` write anything:
+Only `--commit` runs of `apply`, `lookup --apply`, `unpack`, `convert` and `restore` write anything:
 
 | file | |
 | --- | --- |
@@ -298,22 +316,29 @@ Only `--commit` runs of `phase2`, `phase3 --apply`, `unpack`, `convert` and `res
 | tags | per the plan |
 | `.ffp`, `.md5`, `.st5`, `.sfv`, `.cue` | rewritten to the new filenames |
 | `.etree_backup.json` | the tags before they changed; written once and never overwritten |
-| `.etree_state.json` | the settled name, the original name and path, what phase 3 wrote; after `restore`, when and from what |
+| `.etree_state.json` | the settled name, the original name and path, what `lookup` wrote; after `restore`, when and from what |
 | `_etree_review/` | at the top of the library: lossy copies (`--quarantine-lossy`), and originals set aside by `unpack` and `convert` (`originals/`) |
 | extracted folders, `.flac` files, `<folder>.ffp` | from `unpack --commit` and `convert --commit` |
 
 ## Reports
 
-All in `--out-dir`. **The next run into the same folder replaces them.** A
+All in `--out-dir`. The newest run's reports are always at the top of the
+folder, under the names below. **Nothing is lost to the next run:** before a
+run replaces a report, it moves the earlier one into
+`history/<date>T<time> <command>/` in the same folder (the command by its old
+name - `phase1`, `phase2`). `phase1_reads.json.gz`,
+`verify_audio_ledger.csv` and `convert_committed.csv` stay where they are.
+History is never cleared by the tool; delete what you no longer want. A
 `.jamp_run.lock` stops two runs using one folder at once.
 
 | command | files |
 | --- | --- |
-| `phase0` | `phase0_summary.txt`, `phase0_inventory.json`, `phase0_folders.csv`, `phase0_unparsed.csv`, `phase0_bands_stub.yaml`, `phase0_audio_identity.csv`, `phase0_same_audio.csv`, `phase0_verify_audio.csv` (with `--verify-audio`) |
-| `phase1` | `phase1_summary.txt`, `phase1_folders.csv`, `phase1_tracks.csv`, `phase1_tags.csv`, `phase1_sidecars.csv`, `phase1_issues.csv`, `phase1_damaged.csv`, `phase1_plan.json` |
-| `phase2` | `phase2_summary.txt`, `phase2_committed.csv` (every action, written as each folder finishes), `phase2_journal.json` |
-| `phase3` | `phase3_summary.txt`, `phase3_proposals.json`, `phase3_committed.csv` (apply), `phase3_dry_run.csv` (apply without `--commit`) |
-| `complete` | `completeness_summary.txt`, `completeness.csv` |
+| `scan` | `verify_audio_ledger.csv` (with `--verify-audio`, kept between runs), `phase0_summary.txt`, `phase0_inventory.json`, `phase0_folders.csv`, `phase0_unparsed.csv`, `phase0_audio_identity.csv`, `phase0_same_audio.csv`, `phase0_verify_audio.csv` (with `--verify-audio`) |
+| `plan` | `phase1_summary.txt`, `phase1_folders.csv`, `phase1_tracks.csv`, `phase1_tags.csv`, `phase1_sidecars.csv`, `phase1_issues.csv`, `phase1_damaged.csv`, `phase1_plan.json`, `phase1_reads.json.gz` (what each audio file said, reused by the commit for files unchanged since), `phase1_audio_identity.csv` and `phase1_same_audio.csv` (the same reports as `scan`'s, for the folders in the plan) |
+| `apply` | `phase2_summary.txt`, `phase2_committed.csv` (every action, written as each folder finishes), `phase2_journal.json` |
+| `lookup` | `phase3_summary.txt`, `phase3_proposals.json`, `phase3_committed.csv` (apply), `phase3_dry_run.csv` (apply without `--commit`) |
+| `check` | `completeness_summary.txt`, `completeness.csv` |
+| `tidy` | `tidy_summary.txt`, `tidy_plan.csv` and `tidy_plan.json` (dry run), `tidy_committed.csv` (commit) |
 | `unpack` | `unpack_summary.txt`, `unpack_plan.csv` and `unpack_plan.json` (dry run), `unpack_committed.csv` (commit) |
 | `convert` | `convert_summary.txt`, `convert_plan.csv` and `convert_plan.json` (dry run), `convert_committed.csv` (commit; appended to, never replaced, since it is the proof `--set-aside` relies on) |
 | `restore` | `restore_summary.txt`, `restore_steps.csv` and `restore_plan.json` (dry run), `restore_committed.csv` (commit) |
@@ -395,17 +420,23 @@ Tracks: `<act><date>d<disc>t<track>.<ext>` (`gd1977-05-08d1t01.flac`), or
 - Official releases keep their product name, and a show inside one is named
   `YYYY-MM-DD Venue, City, ST`, a disc `Disc N`.
 
-## jamp complete
+## jamp check
 
-Needs phase 0's reports and a show database:
+Needs the durations `plan` or `scan` measured, in the same reports folder, and a
+show database:
 
 ```bash
-python tools/distill_cache.py <out-dir>/cache/archive.sqlite shows.sqlite
-jamp complete --shows shows.sqlite
+jamp plan                  # durations (or jamp scan)
+jamp lookup --seed         # fetches setlists; writes shows.sqlite beside the cache
+jamp check
 ```
 
-`--identity` and `--folders` default to `phase0_audio_identity.csv` and
-`phase0_folders.csv` in `--out-dir`. It never reads the library or the network.
+`--shows` defaults to `shows.sqlite` beside `lookup`'s cache (`--cache` to name
+another cache), built or rebuilt from the cache when it is missing or older.
+`--identity` and `--folders` default to the newer pair in `--out-dir`:
+`phase1_audio_identity.csv` with `phase1_folders.csv`, or
+`phase0_audio_identity.csv` with `phase0_folders.csv`. It never reads the
+library or the network.
 
 | verdict | |
 | --- | --- |
@@ -424,9 +455,8 @@ is a dry run unless given its commit flag.
 
 | tool | |
 | --- | --- |
-| `verify_audio.py` | decode every FLAC against its MD5; resumable. Same check as `phase0 --verify-audio` |
-| `distill_cache.py` | turn phase 3's cache into the small show database `--shows` and `complete` read |
+| `verify_audio.py` | the `scan --verify-audio` check on its own, with a ledger of your choosing |
+| `distill_cache.py` | a show database from any cache, to any destination - a copy to share |
 | `export_cache.py` | a shareable copy of the cache, phish.net rows left out |
-| `empty_dirs.ps1` | Windows: remove completely empty folders under `-Root` (`-Commit`) |
 | `build_gazetteer.py` | seed a `venues.yaml` from a library and its overrides |
 

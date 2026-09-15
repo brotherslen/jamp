@@ -289,5 +289,5 @@ def run(args) -> int:
         save_acts(acts_path, data)
         print()
         print("Saved to %s" % acts_path)
-        print("Next, a dry run for one act:  jamp phase1 --artist \"<folder>\"")
+        print("Next, a dry run for one act:  jamp plan --artist \"<folder>\"")
     return 0

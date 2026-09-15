@@ -44,6 +44,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import setlist
+from .report import report_file
 
 COMPLETE = "COMPLETE"
 TRUNCATED = "TRUNCATED"
@@ -567,5 +568,5 @@ def _write_reports(out_dir: Path, findings: list) -> None:
     block(NOT_COMPARABLE, "Nothing aligned well enough to judge",
           ["A copy exists but does not account for our tracks, so this says",
            "nothing about completeness either way."])
-    (out_dir / "completeness_summary.txt").write_text("\n".join(L) + "\n",
+    report_file(out_dir / "completeness_summary.txt").write_text("\n".join(L) + "\n",
                                                       encoding="utf-8")

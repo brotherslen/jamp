@@ -35,7 +35,7 @@ from pathlib import Path, PurePosixPath
 
 from . import batch
 from .audio import AUDIO_EXTS
-from .report import run_lock, write_csv, write_json
+from .report import report_file, run_lock, write_csv, write_json
 from .scan import _DISC_DIR
 from .winpath import opener
 
@@ -66,10 +66,24 @@ class ZipPlan:
     reason: str = ""
     result: str = ""
     set_aside_to: Path | None = None
+    skipped: int = 0        # macOS resource forks left in the ZIP
 
     @property
     def size(self) -> int:
         return sum(m.size for m in self.members)
+
+
+APPLEDOUBLE_MAGIC = b"\x00\x05\x16\x07"
+
+
+def _is_appledouble(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> bool:
+    if info.file_size < 4 or info.file_size > 1 << 20:
+        return False
+    try:
+        with zf.open(info) as fh:
+            return fh.read(4) == APPLEDOUBLE_MAGIC
+    except (zipfile.BadZipFile, OSError, RuntimeError):
+        return False
 
 
 def _safe_member(name: str) -> PurePosixPath | None:
@@ -161,6 +175,27 @@ def plan_zip(path: Path) -> ZipPlan:
                          % info.compress_type)
             return zp
         parsed.append((info, member))
+
+    # macOS writes a resource-fork file beside each real one when it zips a
+    # folder: "__MACOSX/._track.flac", or - after some downloaders rename it -
+    # "__track.flac" right beside the audio.  4 KB, named like a track, and
+    # not audio at all: extracted, they blocked a show as UNREADABLE_AUDIO.
+    # Recognised by their magic number, never by name alone.
+    try:
+        with zipfile.ZipFile(opener(path)) as zf:
+            kept = []
+            for info, member in parsed:
+                if "__MACOSX" in member.parts or _is_appledouble(zf, info):
+                    zp.skipped += 1
+                else:
+                    kept.append((info, member))
+            parsed = kept
+    except (zipfile.BadZipFile, OSError) as exc:
+        zp.status, zp.reason = REFUSED, "not a readable ZIP: %s" % exc
+        return zp
+    if not parsed:
+        zp.status, zp.reason = REFUSED, "the ZIP holds nothing but macOS resource forks"
+        return zp
 
     where, zp.layout = layout(path, [m for _, m in parsed])
     zp.members = [Member(i.filename, where[m], i.file_size, i.CRC) for i, m in parsed]
@@ -319,6 +354,8 @@ def _report(out_dir, root, cfg, plans, errors, args, wanted) -> None:
             if status == EXTRACT:
                 lines.append("      %d files, %.1f MB - %s:"
                              % (len(zp.members), zp.size / 1e6, zp.layout))
+                if zp.skipped:
+                    lines.append("      (%d macOS resource-fork file(s) left out)" % zp.skipped)
                 for target in zp.targets:
                     lines.append("      -> %s" % rel(target))
             if zp.reason:
@@ -340,7 +377,7 @@ def _report(out_dir, root, cfg, plans, errors, args, wanted) -> None:
                      "%s/%s. Nothing is deleted; empty that folder yourself."
                      % (cfg.settings.review_folder, batch.ORIGINALS))
     text = "\n".join(lines) + "\n"
-    (out_dir / "unpack_summary.txt").write_text(text, encoding="utf-8")
+    report_file(out_dir / "unpack_summary.txt").write_text(text, encoding="utf-8")
     write_csv(out_dir / ("unpack_committed.csv" if committed else "unpack_plan.csv"),
               ["archive", "status", "extracted_to", "files", "bytes", "reason",
                "result", "set_aside_to"],

@@ -129,7 +129,7 @@ def test_commit_without_a_dry_run_is_refused(small_library, tmp_path, home, caps
     out = tmp_path / "reports"
     code = cli.main(["phase2", str(small_library), "--out-dir", str(out), "--commit"])
     assert code == 2
-    assert "jamp phase1" in capsys.readouterr().err
+    assert "jamp plan" in capsys.readouterr().err
     assert not (small_library / "Phish" / "ph1997-11-22.sbd.flac16" /
                 ".etree_state.json").exists()
 
@@ -164,3 +164,105 @@ def test_an_empty_scope_says_so(tmp_path, home, capsys):
     (root / "Phish").mkdir(parents=True)
     assert cli.main(["phase1", str(root), "--out-dir", str(tmp_path / "r")]) == 0
     assert "no show folders found" in capsys.readouterr().out
+
+
+# -- the commands' names -----------------------------------------------------
+
+@pytest.mark.parametrize("new, old", [("scan", "phase0"), ("plan", "phase1"),
+                                      ("apply", "phase2"), ("lookup", "phase3"),
+                                      ("check", "complete")])
+def test_each_command_answers_to_its_new_name_and_its_old_one(new, old):
+    parser = cli.build_parser()
+    for typed in (new, old):
+        args = parser.parse_args([typed, "lib", "--out-dir", "r"])
+        assert cli.INTERNAL_NAMES.get(args.phase, args.phase) == old
+
+
+def test_a_dry_run_and_commit_under_the_new_names(small_library, tmp_path, home):
+    out = tmp_path / "r"
+    assert cli.main(["plan", str(small_library), "--out-dir", str(out)]) == 0
+    assert (out / "phase1_plan.json").exists()           # reports keep their names
+    assert cli.main(["apply", str(small_library), "--out-dir", str(out), "--commit"]) == 0
+    assert any(small_library.rglob(".etree_state.json"))
+
+
+def test_the_old_names_still_commit_a_new_names_dry_run(small_library, tmp_path, home):
+    out = tmp_path / "r"
+    assert cli.main(["plan", str(small_library), "--out-dir", str(out)]) == 0
+    assert cli.main(["phase2", str(small_library), "--out-dir", str(out), "--commit"]) == 0
+
+
+def test_help_lists_the_new_names_with_the_old(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["--help"])
+    out = capsys.readouterr().out
+    for new, old in cli.COMMAND_NAMES.items():
+        assert "%s (%s)" % (old, new) in out or "%s (%s)" % (new, old) in out
+
+
+# -- the commit check covers the options that change what a commit does ----
+
+def _dry_then_commit(root, out, dry_extra=(), commit_extra=()):
+    assert cli.main(["phase1", str(root), "--out-dir", str(out), *dry_extra]) == 0
+    return cli.main(["phase2", str(root), "--out-dir", str(out), "--commit", *commit_extra])
+
+
+@pytest.mark.parametrize("dry, commit", [
+    ((), ("--reclassify",)),
+    (("--reclassify",), ()),
+    ((), ("--unnest",)),
+    (("--unnest",), ()),
+])
+def test_a_commit_asking_for_other_options_than_its_dry_run_is_refused(
+        small_library, tmp_path, home, capsys, dry, commit):
+    assert _dry_then_commit(small_library, tmp_path / "r", dry, commit) == 2
+    err = capsys.readouterr().err
+    assert "was made with" in err and "phase1" in err
+    assert not any(small_library.rglob(".etree_state.json"))
+
+
+def test_matching_options_go_ahead(small_library, tmp_path, home):
+    assert _dry_then_commit(small_library, tmp_path / "r",
+                            ("--reclassify", "--unnest"), ("--reclassify", "--unnest")) == 0
+
+
+def test_a_plan_from_before_the_options_were_recorded_is_refused(small_library, tmp_path,
+                                                                home, capsys):
+    out = tmp_path / "r"
+    assert cli.main(["phase1", str(small_library), "--out-dir", str(out)]) == 0
+    plan = json.loads((out / "phase1_plan.json").read_text(encoding="utf-8"))
+    del plan["reclassify"]
+    (out / "phase1_plan.json").write_text(json.dumps(plan), encoding="utf-8")
+    assert cli.main(["phase2", str(small_library), "--out-dir", str(out), "--commit"]) == 2
+    assert "predates" in capsys.readouterr().err
+
+
+def test_phase1_unnest_lists_the_lifts(tmp_path, home):
+    root = tmp_path / "lib"
+    _show(root, "Phish", "download folder/ph1997-11-22.sbd.flac16", "Phish")
+    out = tmp_path / "r"
+    assert cli.main(["phase1", str(root), "--out-dir", str(out), "--unnest"]) == 0
+    summary = (out / "phase1_summary.txt").read_text(encoding="utf-8")
+    assert "Lifted out of their folder by --unnest (1)" in summary
+    assert "download folder" in summary
+    assert json.loads((out / "phase1_plan.json").read_text(encoding="utf-8"))["unnest"] is True
+    assert (root / "Phish" / "download folder").is_dir()        # a dry run moved nothing
+
+
+# -- a commit keeps going until settled, unless told otherwise --------------
+
+@pytest.mark.parametrize("extra, looping", [((), True), (("--one-pass",), False),
+                                            (("--until-settled",), True)])
+def test_commit_settles_by_default(small_library, tmp_path, home, monkeypatch, extra, looping):
+    from jamp import phase2
+
+    seen = {}
+    real = phase2.run
+
+    def spy(*a, **k):
+        seen["until_settled"] = k["until_settled"]
+        return real(*a, **k)
+
+    monkeypatch.setattr(phase2, "run", spy)
+    assert _dry_then_commit(small_library, tmp_path / "r", (), extra) == 0
+    assert seen["until_settled"] is looping

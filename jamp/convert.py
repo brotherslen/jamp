@@ -38,7 +38,7 @@ from pathlib import Path
 
 from . import batch
 from .integrity import flac_streaminfo, locate_ffmpeg
-from .report import run_lock, write_csv, write_json
+from .report import report_file, run_lock, write_csv, write_json
 from .winpath import opener
 
 COMMAND = "convert"
@@ -324,7 +324,7 @@ def _report(out_dir, root, cfg, plans, errors, args, wanted) -> None:
                      "into %s/%s. Nothing is deleted; empty that folder yourself."
                      % (cfg.settings.review_folder, batch.ORIGINALS))
     text = "\n".join(lines) + "\n"
-    (out_dir / "convert_summary.txt").write_text(text, encoding="utf-8")
+    report_file(out_dir / "convert_summary.txt").write_text(text, encoding="utf-8")
     header = ["shn_path", "flac_path", "result", "detail", "shn_md5", "flac_md5",
               "shn_size", "shn_mtime", "flac_size", "flac_mtime", "set_aside_to"]
 

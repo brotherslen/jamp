@@ -139,6 +139,73 @@ def repeated_within(index: dict) -> list[tuple[str, str, list[str]]]:
     return out
 
 
+def write_reports(out_dir, shows, prefix: str):
+    """Build the index from `shows` and write `<prefix>_audio_identity.csv` and
+    `<prefix>_same_audio.csv`.  Returns (index, matches, repeats, stats).
+
+    The one writer of both files, for scan and plan alike: `check` reads either
+    command's, so the two must not describe a track in two different ways.
+    """
+    from pathlib import Path
+
+    from .report import write_csv
+
+    out_dir = Path(out_dir)
+    index = index_folders(shows)
+    matches = find_matches(index)
+    repeats = repeated_within(index)
+
+    # One row per track that could be identified: the recording's own MD5, its
+    # exact length in samples, and what it is filed as.  This is the durable
+    # artifact - everything else is a reading of it, and a later question we
+    # have not thought of yet can be answered from the CSV without re-walking
+    # the library.
+    write_csv(
+        out_dir / ("%s_audio_identity.csv" % prefix),
+        ["relative_path", "file", "audio_md5", "samples", "seconds",
+         "bits", "rate", "channels", "bytes"],
+        (
+            [str(show.path.relative_to(show.root)), f.name, f.audio_md5 or "",
+             f.samples if f.samples is not None else "",
+             "%.3f" % f.length if f.length else "",
+             f.bits or "", f.rate or "", f.channels or "", f.size]
+            for show in shows for f in show.files
+            if f.audio_md5 or f.samples
+        ),
+    )
+    write_csv(
+        out_dir / ("%s_same_audio.csv" % prefix),
+        ["kind", "folder_a", "folder_b", "shared_tracks", "tracks_a", "tracks_b",
+         "example_file", "note"],
+        (
+            [m.kind, m.left, m.right, m.shared, m.left_total, m.right_total,
+             m.examples[0] if m.examples else "", m.note]
+            for m in matches
+        ),
+    )
+    return index, matches, repeats, summarize(index, matches)
+
+
+def report_matches(rep, matches, repeats, csv_name: str, limit: int = 60) -> None:
+    """The summary's account of shared audio, the same in scan's and plan's."""
+    if matches:
+        rep.heading("Folders holding the same audio (%d)" % len(matches))
+        rep.line("  Reported, never resolved - nothing here is deleted or moved.")
+        for m in matches[:limit]:
+            rep.line("  %s" % m.kind)
+            rep.line("      %s" % m.left)
+            rep.line("      %s" % m.right)
+            rep.line("      %s" % m.note)
+        if len(matches) > limit:
+            rep.line("  ... and %d more, all of them in %s" % (len(matches) - limit, csv_name))
+    if repeats:
+        rep.heading("One folder holding the same audio twice (%d)" % len(repeats))
+        rep.line("  Two filenames, one recording - easy to read as a longer show.")
+        for folder, _h, names in repeats[:25]:
+            rep.line("  %s" % folder)
+            rep.line("      %s" % ", ".join(n[:40] for n in names[:4]))
+
+
 def summarize(index: dict, matches: list[AudioMatch]) -> dict:
     files = sum(len(n) for h in index.values() for n in h.values())
     return {

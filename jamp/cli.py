@@ -1,15 +1,19 @@
 """Command line entry point.
 
-    py -m jamp phase0   "D:\\Music\\Live" --out-dir "D:\\jamp-reports"
-    py -m jamp phase1   "D:\\Music\\Live" --out-dir "D:\\jamp-reports"
-    py -m jamp phase2   "D:\\Music\\Live" --out-dir "D:\\jamp-reports" --commit
-    py -m jamp phase3   "D:\\Music\\Live" --out-dir "D:\\jamp-reports"
-    py -m jamp complete "D:\\Music\\Live" --out-dir "D:\\jamp-reports" --shows <db>
+    py -m jamp scan   "D:\\Music\\Live" --out-dir "D:\\jamp-reports"
+    py -m jamp plan   "D:\\Music\\Live" --out-dir "D:\\jamp-reports"
+    py -m jamp apply  "D:\\Music\\Live" --out-dir "D:\\jamp-reports" --commit
+    py -m jamp lookup "D:\\Music\\Live" --out-dir "D:\\jamp-reports"
+    py -m jamp check  "D:\\Music\\Live" --out-dir "D:\\jamp-reports"
 
-Dry run is not a flag you remember to pass - it is what every phase does
-without --commit.  Two things write, and only with --commit: phase2, and
-phase3 --apply, which fills tags named in a report that already exists.
-Phases 0 and 1 and `complete` refuse --commit outright.
+Each has its older name as well - phase0, phase1, phase2, phase3 and complete -
+and both always will: the old names are in scripts, notes and every report
+this tool has written (phase1_plan.json, phase2_committed.csv), which keep them.
+
+Dry run is not a flag you remember to pass - it is what every command does
+without --commit.  Two things write, and only with --commit: apply, and
+lookup --apply, which fills tags named in a report that already exists.
+scan, plan and check refuse --commit outright.
 """
 from __future__ import annotations
 
@@ -23,7 +27,19 @@ from . import __version__, confirm, phase0, phase1, phase2
 from .config import ConfigError, load_config
 from .overrides import Overrides
 from . import userdir
-from .report import ensure_out_dir
+from .report import ensure_out_dir, run_lock
+
+
+# The name each command goes by, for the names it started with.  The old ones
+# stay accepted for good; reports keep them too (phase1_plan.json).
+COMMAND_NAMES = {
+    "phase0": "scan",
+    "phase1": "plan",
+    "phase2": "apply",
+    "phase3": "lookup",
+    "complete": "check",
+}
+INTERNAL_NAMES = {new: old for old, new in COMMAND_NAMES.items()}
 
 
 def settings_path() -> Path:
@@ -58,7 +74,46 @@ def save_settings(values: dict) -> Path:
     return p
 
 
-def _plan_check(out_dir: Path, root: Path, artists: set[str] | None) -> str | None:
+def _settings_record(cfg, overrides_path: Path | None) -> dict[str, str]:
+    """Every settings file that shapes a plan, with a digest of what it held.
+
+    A plan is only as good as the settings it was made with.  A dry run once
+    ran in a window that could not see the user folder: no ignore_folders, no
+    overrides, fifteen renames nobody wanted - and the commit after it would
+    have matched its plan in every respect the check then looked at.
+    """
+    import hashlib
+
+    from .config import VENUES_NAME
+
+    files = {
+        "shipped config": cfg.path,
+        "shipped venues": Path(cfg.path).parent / VENUES_NAME,
+        "your config": userdir.user_config_path(),
+        "your acts": userdir.user_dir() / "acts.yaml",
+        "your venues": userdir.user_dir() / VENUES_NAME,
+        "your overrides": overrides_path,
+    }
+    out = {}
+    for label, path in files.items():
+        if path is None:
+            out[label] = "none"
+            continue
+        try:
+            digest = hashlib.sha1(Path(path).read_bytes()).hexdigest()
+        except OSError:
+            digest = "absent"
+        out[label] = "%s %s" % (path, digest)
+    return out
+
+
+def _settings_problem(cfg) -> str | None:
+    return userdir.unseen_settings(cfg.user_path is not None)
+
+
+def _plan_check(out_dir: Path, root: Path, artists: set[str] | None,
+                reclassify: bool = False, unnest: bool = False,
+                settings: dict[str, str] | None = None) -> str | None:
     """Why a commit should not go ahead yet, or None.
 
     A commit is meant to follow a dry run somebody read.  Requiring the plan
@@ -67,23 +122,58 @@ def _plan_check(out_dir: Path, root: Path, artists: set[str] | None) -> str | No
     """
     plan = out_dir / "phase1_plan.json"
     if not plan.exists():
-        return "no phase 1 dry run in %s" % out_dir
+        return "no dry run (jamp plan) in %s" % out_dir
     try:
         data = json.loads(plan.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        return "the phase 1 plan in %s cannot be read: %s" % (out_dir, exc)
-    if "root" not in data:
-        return ("the phase 1 plan in %s predates this check; run phase 1 again"
+        return "the dry run's plan in %s cannot be read: %s" % (out_dir, exc)
+    # Format 2 records what each folder looked like, which the commit checks.
+    if ("root" not in data or "reclassify" not in data or "settings" not in data
+            or data.get("plan_format", 1) < 2):
+        return ("the dry run's plan in %s predates this check; run jamp plan again"
                 % out_dir)
     if data.get("root") != str(root):
-        return ("the phase 1 plan in %s is for %s, not %s"
+        return ("the dry run's plan in %s is for %s, not %s"
                 % (out_dir, data.get("root"), root))
     wanted = sorted(artists) if artists else None
     if data.get("scope") != wanted:
-        return ("the phase 1 plan in %s covered %s, not %s"
+        return ("the dry run's plan in %s covered %s, not %s"
                 % (out_dir, ", ".join(data["scope"]) if data.get("scope") else "the whole library",
                    ", ".join(wanted) if wanted else "the whole library"))
+    for flag, asked in (("--reclassify", reclassify), ("--unnest", unnest)):
+        made = bool(data.get(flag.strip("-")))
+        if made != bool(asked):
+            return ("the dry run's plan in %s was made %s %s, and this commit is %s it"
+                    % (out_dir, "with" if made else "without", flag,
+                       "without" if made else "with"))
+    if settings is not None:
+        then = data.get("settings") or {}
+        changed = [label for label in sorted(set(then) | set(settings))
+                   if then.get(label) != settings.get(label)]
+        if changed:
+            return ("the dry run's plan in %s was made with different settings: %s "
+                    "(was %s, now %s)"
+                    % (out_dir, changed[0], then.get(changed[0], "not recorded"),
+                       settings.get(changed[0], "not recorded")))
     return None
+
+
+def _identity_reports(out_dir: Path) -> tuple[Path, Path] | None:
+    """The newest pair of durations and folder reports in `out_dir`, or None.
+
+    plan and scan both write one: plan's describes the library as it is after
+    any commit since, and is what a normal run leaves; scan's is older news.
+    """
+    pairs = []
+    for prefix in ("phase1", "phase0"):
+        identity = out_dir / ("%s_audio_identity.csv" % prefix)
+        folders = out_dir / ("%s_folders.csv" % prefix)
+        if identity.exists() and folders.exists():
+            pairs.append((identity.stat().st_mtime, identity, folders))
+    if not pairs:
+        return None
+    _, identity, folders = max(pairs)
+    return identity, folders
 
 
 def _read_phish_key(args):
@@ -111,23 +201,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="jamp",
         description="Rename, tag and check a live music archive without destroying "
-                    "anything.  Every phase is a dry run unless given --commit, and "
-                    "reports never go inside ROOT.",
+                    "anything.  Every command is a dry run unless given --commit, "
+                    "and reports never go inside ROOT.  The usual order: scan, "
+                    "plan, apply --commit, then lookup and check.",
     )
     parser.add_argument("--version", action="version", version="jamp %s" % __version__)
-    sub = parser.add_subparsers(dest="phase", required=True)
+    # A metavar, or the usage line lists every name and alias in one long brace.
+    sub = parser.add_subparsers(dest="phase", required=True, metavar="COMMAND")
 
     for name, help_text in (
-        ("phase0", "walk ROOT and report what is actually there"),
-        ("phase1", "produce the full proposed rename and tag plan"),
-        ("phase2", "apply the plan: renames, tags and checksum files; needs --commit"),
+        ("phase0", "what is in the library: an inventory, and which folders "
+                   "hold the same audio"),
+        ("phase1", "the dry run: every proposed rename and tag change"),
+        ("phase2", "carry out the plan: renames, tags and checksum files; needs "
+                   "--commit"),
         ("phase3", "ask archive.org, phish.in, phish.net, jerrybase and the MMJ "
                    "archive to fill in what the files never said; a report, "
                    "unless --apply --commit"),
-        ("complete", "is a recording missing songs? compares phase 0's "
-                     "durations against the known setlist; reports only"),
+        ("complete", "is a recording missing songs? compares the durations plan "
+                     "or scan measured against the known setlist; reports only"),
     ):
-        p = sub.add_parser(name, help=help_text)
+        p = sub.add_parser(COMMAND_NAMES[name], aliases=[name], help=help_text)
         p.add_argument("root", metavar="ROOT", type=Path, nargs="?", default=None,
                        help="the library (read only). May be omitted once `jamp "
                             "init` or --remember has saved one")
@@ -144,7 +238,7 @@ def build_parser() -> argparse.ArgumentParser:
                        help="path to overrides.yaml: answers you have given that the "
                             "files do not contain (default: the one in your user folder)")
         p.add_argument("--commit", action="store_true",
-                       help="phase 2 only: actually write. Refused in phases 0 and 1")
+                       help="apply only: actually write. Refused by scan, plan and check")
         p.add_argument("--today", type=_dt.date.fromisoformat, default=None,
                        help="pretend today is this date (for reproducible tests)")
         p.add_argument("--artist", action="append", metavar="FOLDER", default=None,
@@ -153,18 +247,24 @@ def build_parser() -> argparse.ArgumentParser:
                             "artist folder is still available as evidence")
         if name == "complete":
             p.add_argument("--shows", type=Path, default=None,
-                           help="the distilled show database from "
-                                "tools/distill_cache.py; this is the only "
-                                "reference it reads and it never goes online")
+                           help="the distilled show database; this is the only "
+                                "reference it reads and it never goes online "
+                                "(default: shows.sqlite beside lookup's cache, "
+                                "built or refreshed from the cache when needed)")
+            p.add_argument("--cache", type=Path, default=None,
+                           help="lookup's cache to build the show database "
+                                "from (default: the one lookup uses)")
             p.add_argument("--identity", type=Path, default=None,
-                           help="phase0_audio_identity.csv (default: the one "
-                                "in --out-dir)")
+                           help="an audio identity report (default: the newer "
+                                "of phase1_audio_identity.csv and "
+                                "phase0_audio_identity.csv in --out-dir)")
             p.add_argument("--folders", type=Path, default=None,
-                           help="phase0_folders.csv (default: the one in "
-                                "--out-dir)")
+                           help="the folders report written with it (default: "
+                                "phase1_folders.csv or phase0_folders.csv, "
+                                "whichever goes with that identity report)")
         if name == "phase3":
             p.add_argument("--cache", type=Path, default=None,
-                           help="the cache of everything phase 3 has fetched "
+                           help="the cache of everything lookup has fetched "
                                 "(default: archive.sqlite in your cache folder, "
                                 "or one already in <out-dir>/cache)")
             p.add_argument("--shows", type=Path, default=None,
@@ -210,7 +310,13 @@ def build_parser() -> argparse.ArgumentParser:
         if name in ("phase1", "phase2"):
             p.add_argument("--reclassify", action="store_true",
                            help="re-examine folders a previous commit already settled, "
-                                "ignoring their .etree_state.json")
+                                "ignoring their .etree_state.json. A commit needs "
+                                "it exactly when its dry run had it")
+            p.add_argument("--unnest", action="store_true",
+                           help="lift a show out of a container folder that holds "
+                                "nothing else; the empty container is left behind. "
+                                "In plan it lists the lifts; a commit with it "
+                                "needs a dry run with it")
         if name == "phase2":
             p.add_argument("--settle", action="store_true",
                            help="rename nothing; record every folder already named by "
@@ -218,16 +324,16 @@ def build_parser() -> argparse.ArgumentParser:
             p.add_argument("--quarantine-lossy", action="store_true",
                            help="move MP3s that duplicate a lossless copy of the same "
                                 "recording into the review folder; nothing is deleted")
-            p.add_argument("--unnest", action="store_true",
-                           help="lift a show out of a container folder that holds "
-                                "nothing else; the empty container is left behind")
+            p.add_argument("--one-pass", action="store_true",
+                           help="commit a single pass. By default a commit keeps "
+                                "going until a pass changes nothing: each commit "
+                                "changes what the next read sees, so the answer "
+                                "converges over a few passes")
             p.add_argument("--until-settled", action="store_true",
-                           help="keep committing until nothing is left to do. Each "
-                                "commit changes what the next read sees, so the answer "
-                                "converges over a few passes; this does them for you "
-                                "and stops as soon as a pass changes nothing")
+                           help="the default for --commit; accepted so older "
+                                "commands keep working")
             p.add_argument("--skip-plan-check", action="store_true",
-                           help="commit even though --out-dir holds no phase 1 "
+                           help="commit even though --out-dir holds no plan "
                                 "dry run of this library and scope. Not "
                                 "recommended: reading that plan is the check")
             p.add_argument("--include-merges", action="store_true",
@@ -257,6 +363,19 @@ def build_parser() -> argparse.ArgumentParser:
                    help="with --add: the act's name (default: from the folder)")
     p.add_argument("--ignore", metavar="FOLDER", action="append", default=None,
                    help="never scan this folder; repeat for several")
+    p = sub.add_parser("tidy", help="remove folders with nothing at all in them, "
+                                    "such as wrappers an unnest or merge emptied")
+    p.add_argument("root", metavar="ROOT", type=Path, nargs="?", default=None,
+                   help="the library (default: remembered)")
+    p.add_argument("--out-dir", type=Path, default=None,
+                   help="where reports go (default: remembered)")
+    p.add_argument("--artist", action="append", metavar="FOLDER", default=None,
+                   help="only inside this top-level folder; repeat for several")
+    p.add_argument("--commit", action="store_true",
+                   help="actually remove them. Refused without a dry run of the "
+                        "same scope in --out-dir")
+    p.add_argument("--skip-plan-check", action="store_true",
+                   help="commit without that dry run")
     for name, help_text in (
         ("unpack", "extract the ZIP files in the library beside themselves, each "
                    "file checked against the ZIP's CRC"),
@@ -309,6 +428,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    # argparse reports whichever name was typed.  Everything below, and every
+    # report, speaks the internal name.
+    args.phase = INTERNAL_NAMES.get(args.phase, args.phase)
 
     if args.phase in ("init", "doctor"):
         from . import install
@@ -318,6 +440,10 @@ def main(argv: list[str] | None = None) -> int:
         from . import convert, unpack
 
         return (unpack if args.phase == "unpack" else convert).run(args)
+    if args.phase == "tidy":
+        from . import tidy
+
+        return tidy.run(args)
     if args.phase == "restore":
         from . import restore
 
@@ -330,8 +456,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.commit and args.phase != "phase2" and not (
             args.phase == "phase3" and getattr(args, "apply", False)):
         print(
-            "--commit is refused here: only phase2, and phase3 --apply, write.\n"
-            "Review the CSVs in --out-dir first, then run phase2 --commit.",
+            "--commit is refused here: only apply, and lookup --apply, write.\n"
+            "Review the CSVs in --out-dir first, then run apply --commit.",
             file=sys.stderr,
         )
         return 2
@@ -357,7 +483,7 @@ def main(argv: list[str] | None = None) -> int:
         print("ROOT and --out-dir are required. Give them once with "
               "--remember and later runs can leave them out:"
               + chr(10) +
-              '  py -m jamp phase1 "<library>" --out-dir "<reports>" --remember',
+              '  py -m jamp plan "<library>" --out-dir "<reports>" --remember',
               file=sys.stderr)
         return 2
     root = args.root.resolve()
@@ -395,6 +521,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if len(overrides):
         print("  overrides: %d folder(s) from %s" % (len(overrides), overrides_path))
+    problem = _settings_problem(cfg)
+    if problem:
+        print("refused: %s" % problem, file=sys.stderr)
+        return 2
+    settings = _settings_record(cfg, overrides_path)
 
     artists = set(args.artist) if args.artist else None
     if artists:
@@ -408,26 +539,51 @@ def main(argv: list[str] | None = None) -> int:
         from .showstore import ShowStore
         from . import complete as _complete
 
-        identity = args.identity or (out_dir / "phase0_audio_identity.csv")
-        folders = args.folders or (out_dir / "phase0_folders.csv")
+        identity, folders = args.identity, args.folders
+        if identity is None or folders is None:
+            found = _identity_reports(out_dir)
+            if found is None:
+                print("no durations to check in %s. Run jamp plan (or jamp scan) "
+                      "into it first - check reads their reports rather than the "
+                      "library, so the durations are already measured." % out_dir,
+                      file=sys.stderr)
+                return 2
+            identity = identity or found[0]
+            folders = folders or found[1]
+            print("  durations from %s" % Path(identity).name)
         for needed, what in ((identity, "--identity"), (folders, "--folders")):
             if not Path(needed).exists():
                 print("%s does not exist: %s" % (what, needed), file=sys.stderr)
-                print("Run phase0 first - this reads its reports rather than "
-                      "the library, so the durations are already measured.",
-                      file=sys.stderr)
                 return 2
+        if args.shows is None:
+            from . import distill
+
+            cache_path, _why = userdir.cache_path(args.cache, out_dir)
+            args.shows = distill.shows_path_for(cache_path)
+            if distill.is_stale(cache_path, args.shows):
+                if not Path(cache_path).exists():
+                    print("no show database yet: lookup has not fetched anything "
+                          "(no cache at %s). Run `jamp lookup --seed` first, or "
+                          "give --shows." % cache_path, file=sys.stderr)
+                    return 2
+                print("  building the show database from %s ..." % cache_path, flush=True)
+                got = distill.distill(cache_path, args.shows)
+                print("  %d shows, %d tracks -> %s" % (got["shows"], got["tracks"], args.shows))
         store = ShowStore(args.shows)
         if not store:
-            print("no usable show database at %s. Point --shows at the file "
-                  "tools/distill_cache.py produced." % args.shows, file=sys.stderr)
+            print("no usable show database at %s. Run `jamp lookup --seed` to "
+                  "build one, or point --shows at another." % args.shows,
+                  file=sys.stderr)
             return 2
         shows = _complete.in_scope(_complete.load_shows(Path(identity), Path(folders)),
                                    artists)
         print("  %d folders with durations, %d shows in %s"
               % (len(shows), store.stats()["shows"], args.shows))
-        counts = _complete.run(shows, cfg, store, out_dir,
-                               progress=lambda m: print(m, flush=True))
+        # Held like every other command's, so two runs cannot interleave their
+        # reports and each keeps the one before it in history/.
+        with run_lock(out_dir, "complete"):
+            counts = _complete.run(shows, cfg, store, out_dir,
+                                   progress=lambda m: print(m, flush=True))
         store.close()
         print("Completeness: %d folders judged" % counts.pop("folders", 0))
         for k in (_complete.TRUNCATED, _complete.SHORT_BY_COUNT,
@@ -456,6 +612,13 @@ def main(argv: list[str] | None = None) -> int:
             print("  %-30s %d" % (k, v))
         print("  cache now: %d URLs, %.1f MB (%d served, %d fetched)"
               % (c["urls"], c["bytes"] / 1048576.0, c["hits"], c["fetches"]))
+        # The small database `complete` and `--shows` read, kept beside the cache.
+        from . import distill
+
+        shows = distill.shows_path_for(cache_path)
+        got = distill.distill(cache_path, shows)
+        print("  show database: %d shows, %d tracks, %.1f MB -> %s"
+              % (got["shows"], got["tracks"], got["shows_mb"], shows))
         print("  nothing was written inside %s" % root)
         return 0
 
@@ -463,12 +626,13 @@ def main(argv: list[str] | None = None) -> int:
         proposals = out_dir / "phase3_proposals.json"
         if not proposals.exists():
             print("--apply is refused: %s does not exist. "
-                  "Run phase3 without --apply first, and read the report."
+                  "Run jamp lookup without --apply first, and read the report."
                   % proposals, file=sys.stderr)
             return 2
         dry = not args.commit
-        stats = confirm.apply_proposals(root, out_dir, proposals, dry_run=dry,
-                                        progress=None, artists=artists)
+        with run_lock(out_dir, "phase3"):
+            stats = confirm.apply_proposals(root, out_dir, proposals, dry_run=dry,
+                                            progress=None, artists=artists)
         head = "Phase 3 apply (dry run)" if dry else "Phase 3 APPLIED"
         print("%s: %d folders, %d files, TITLE %d, VENUE %d"
               % (head, stats.get("folders", 0), stats.get("files", 0),
@@ -501,9 +665,10 @@ def main(argv: list[str] | None = None) -> int:
             elif store:
                 st = store.stats()
                 print("  shows: %d from %s" % (st["shows"], args.shows))
-            stats = confirm.run(root, out_dir, cfg, cache, artists=artists,
-                                progress=lambda m: print(m, flush=True),
-                                phish_key=phish_key, store=store or None)
+            with run_lock(out_dir, "phase3"):
+                stats = confirm.run(root, out_dir, cfg, cache, artists=artists,
+                                    progress=lambda m: print(m, flush=True),
+                                    phish_key=phish_key, store=store or None)
             store.close()
         print("Phase 3: %d folders looked at, %d missing something."
               % (stats["folders"], stats["proposals"]))
@@ -553,7 +718,8 @@ def main(argv: list[str] | None = None) -> int:
     elif args.phase == "phase1":
         counts = phase1.run(root, out_dir, cfg, today=args.today,
                             reclassify=args.reclassify, include_top=artists,
-                            overrides=overrides)
+                            overrides=overrides, unnest=args.unnest,
+                            settings=settings)
         if not counts:
             print("Phase 1 (dry run): no show folders found under %s%s.\n"
                   "  A show folder is one holding audio (FLAC, MP3, M4A, WMA, OGG, "
@@ -566,13 +732,16 @@ def main(argv: list[str] | None = None) -> int:
         print("  nothing was written inside %s" % root)
     else:
         if args.commit and not args.skip_plan_check:
-            why = _plan_check(out_dir, root, artists)
+            why = _plan_check(out_dir, root, artists, reclassify=args.reclassify,
+                              unnest=args.unnest, settings=settings)
             if why:
                 scope = "".join(' --artist "%s"' % a for a in sorted(artists or ()))
+                scope += "".join(" --%s" % f for f in ("reclassify", "unnest")
+                                 if getattr(args, f))
                 print("--commit refused: %s.\n"
                       "Run the dry run first, into the same reports folder, and read "
                       "phase1_summary.txt:\n"
-                      '  jamp phase1 "%s" --out-dir "%s"%s'
+                      '  jamp plan "%s" --out-dir "%s"%s'
                       % (why, root, out_dir, scope), file=sys.stderr)
                 return 2
         if args.commit and args.unnest:
@@ -587,12 +756,30 @@ def main(argv: list[str] | None = None) -> int:
                            unnest=args.unnest,
                            quarantine_lossy=args.quarantine_lossy,
                            include_top=artists, overrides=overrides,
-                           until_settled=args.until_settled)
+                           until_settled=not args.one_pass,
+                           check_plan=args.commit and not args.skip_plan_check)
         if args.commit:
+            refused = stats.get("refused_by_plan", 0)
             print("Phase 2 COMMITTED: %d folders, %d actions, %d failed and rolled back."
-                  % (stats["folders_done"], stats["actions"], stats["folders_failed"]))
+                  % (stats["folders_done"], stats["actions"],
+                     stats["folders_failed"] - refused))
+            if refused:
+                print("  %d folder(s) NOT committed: their plan is no longer what the "
+                      "dry run showed - see phase2_summary.txt, and run jamp plan again"
+                      % refused)
+            if stats.get("planned_not_offered"):
+                print("  %d folder(s) in the dry run's plan are no longer work and were "
+                      "left alone - see phase2_summary.txt" % stats["planned_not_offered"])
             if stats.get("passes", 1) > 1:
                 print("  took %d passes" % stats["passes"])
+            if stats.get("beyond_dry_run"):
+                print("  %d folder(s) were committed by a later pass, beyond what the "
+                      "dry run showed - listed in phase2_summary.txt"
+                      % stats["beyond_dry_run"])
+            if stats.get("reads_reused"):
+                print("  file reads: %d reused from the dry run or an earlier pass, "
+                      "%d read from disk"
+                      % (stats["reads_reused"], stats.get("files_read", 0)))
             print("  every change is listed in phase2_committed.csv")
             left = stats.get("remaining")
             if left == 0:
@@ -604,8 +791,8 @@ def main(argv: list[str] | None = None) -> int:
                                       for k, v in sorted(held.items())))
             elif left:
                 print("  %d folder(s) still need work%s. Re-run to continue."
-                      % (left, "" if args.until_settled else
-                         " - or pass --until-settled to keep going automatically"))
+                      % (left, " - drop --one-pass to keep going automatically"
+                         if args.one_pass else ""))
         else:
             print("Phase 2 (dry run): %d folders selected, %d actions planned."
                   % (stats["folders_selected"], stats["actions"]))

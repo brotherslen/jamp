@@ -9,13 +9,13 @@ and which names the parser could not read.
 from __future__ import annotations
 
 import datetime as _dt
-import re
 from collections import Counter
 from pathlib import Path
 
 from . import classify as _classify
 from . import identity as _identity
 from . import integrity as _integrity
+from . import verify as _verify
 from .analyze import BOXSET, SEVERITY_BLOCK, ShowAnalysis, analyze_show
 from .config import Config
 from .report import TextReport, ensure_out_dir, run_lock, write_csv, write_json
@@ -49,16 +49,17 @@ def run(
 
         # Identity is read from every file as it is scanned, so this costs
         # nothing beyond the arithmetic: which folders hold the same audio.
-        index = _identity.index_folders(result.shows)
-        matches = _identity.find_matches(index)
-        repeats = _identity.repeated_within(index)
-        stats.update(_identity.summarize(index, matches))
+        # plan writes the same two files from its own scan.
+        index, matches, repeats, id_stats = _identity.write_reports(
+            out_dir, result.shows, "phase0")
+        stats.update(id_stats)
 
         # Integrity is a different order of cost - a full decode of every file -
         # so it happens only when asked for.
         verdicts = []
         if verify_audio:
-            verdicts = _verify_all(result, workers=workers, progress=progress)
+            verdicts = _verify_all(result, workers=workers, progress=progress,
+                                   ledger=out_dir / _verify.LEDGER_NAME)
             for key in (_integrity.PASS, _integrity.MISMATCH,
                         _integrity.UNREADABLE, _integrity.NO_MD5):
                 stats["verify_" + key.lower()] = sum(
@@ -69,36 +70,35 @@ def run(
         return stats
 
 
-def _verify_all(result: ScanResult, workers: int = 4, progress=None) -> list:
+def _verify_all(result: ScanResult, workers: int = 4, progress=None, *,
+                ledger: Path) -> list:
     """Decode every FLAC and compare it against the MD5 it carries.
 
     Opt-in, because it is hours rather than minutes.  What it catches is a file
     that decodes perfectly well to audio that is not what its own header
     describes - damage no structural check can see, because from outside such a
     file reads, tags and plays exactly like a healthy one.
-    """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
 
+    Resumable: verdicts go to a ledger in the reports folder as they are made,
+    and a file already there at the same size and modification time is not
+    decoded again.
+    """
     ffmpeg = _integrity.find_ffmpeg()
-    jobs = [(show, f) for show in result.shows for f in show.files
-            if f.ext == ".flac"]
+    jobs = [(show, f) for show in result.shows for f in show.files if f.ext == ".flac"]
+    root = result.root
+    verdicts = _verify.verify_files(
+        [f.path for _, f in jobs], root,
+        ledger, ffmpeg, workers=workers, progress=progress)
     out = []
-    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        futures = {pool.submit(_integrity.verify, ffmpeg, f.path): (show, f)
-                   for show, f in jobs}
-        for i, fut in enumerate(as_completed(futures), 1):
-            show, f = futures[fut]
-            try:
-                v = dict(fut.result())
-            except Exception as exc:                # noqa: BLE001 - never silent
-                v = {"status": _integrity.UNREADABLE, "stored_md5": "",
-                     "decoded_md5": "", "seconds": None,
-                     "detail": "verifier raised: %s" % str(exc)[:200]}
-            v["folder"] = str(show.path.relative_to(show.root))
-            v["file"] = f.name
-            out.append(v)
-            if progress and (i % 50 == 0 or i == len(futures)):
-                progress("  verified %d/%d" % (i, len(futures)))
+    for show, f in jobs:
+        row = verdicts.get(str(f.path.relative_to(root)))
+        if row is None:
+            continue
+        out.append({"status": row["status"],
+                    "stored_md5": row["stored_md5"], "decoded_md5": row["decoded_md5"],
+                    "seconds": float(row["seconds"]) if row.get("seconds") else None,
+                    "detail": row["detail"],
+                    "folder": str(show.path.relative_to(show.root)), "file": f.name})
     out.sort(key=lambda v: (v["folder"], v["file"]))
     return out
 
@@ -251,68 +251,30 @@ def unparsed_sample(analyses: list[ShowAnalysis], limit: int = UNPARSED_SAMPLE):
     return [a for _, a in scored[:limit]]
 
 
-def _band_stub_name(folder_name: str) -> tuple[str, str]:
-    """A guessed abbreviation and display name for an unrecognised artist."""
-    lead = re.split(r"\d", folder_name, maxsplit=1)[0]
-    words = [w for w in re.split(r"[^A-Za-z']+", lead) if w and w.lower() not in ("the", "and")]
-    if not words:
-        return "xx", folder_name.strip()
-    if len(words) == 1:
-        abbrev = words[0][:3].lower()
-    else:
-        abbrev = "".join(w[0] for w in words[:4]).lower()
-    return abbrev, " ".join(words)
+def unresolved_artists(analyses: list[ShowAnalysis]) -> list[tuple[str, int]]:
+    """Folders the config names no act for, grouped by the folder they sit in.
 
-
-def write_bands_stub(out_dir: Path, analyses: list[ShowAnalysis]) -> int:
-    """Emit a `bands:` block for every artist the config does not know.
-
-    Paste it into jamp.yaml, fix the abbreviations, and re-run.
+    This used to be written out as phase0_bands_stub.yaml, a block of guessed
+    abbreviations to paste into the config.  `jamp acts` does that job and
+    refuses an abbreviation that would misfile shows, which a pasted guess
+    never did, so the inventory only counts them and points there.
     """
-    unknown: dict[str, list[ShowAnalysis]] = {}
+    unknown: dict[str, int] = {}
     for a in analyses:
         if a.band.band is not None:
             continue
         key = (a.show.artist_dir or a.show.name).strip()
-        unknown.setdefault(key, []).append(a)
-
-    lines = [
-        "# Artists Phase 0 could not resolve, as a paste-ready config block.",
-        "# Check every abbreviation before pasting - they are guesses, and the",
-        "# abbreviation becomes the folder-name prefix for every one of these shows.",
-        "",
-    ]
-    if not unknown:
-        lines.append("# (none - every folder resolved to a band in the config)")
-    else:
-        lines.append("bands:")
-        for key, group in sorted(unknown.items()):
-            abbrev, name = _band_stub_name(key)
-            years = sorted({a.date.date.year for a in group if a.date.date})
-            span = "[%d, %d]" % (years[0], years[-1]) if years else "[1960, 2035]"
-            suggestions = sorted({s for a in group for s in a.band.suggestions})
-            lines.append("  - abbrev: %s" % abbrev)
-            lines.append("    name: %s" % name)
-            lines.append("    prefixes: [%s]" % abbrev)
-            lines.append("    aliases: [%r]" % name)
-            lines.append("    active_years: %s" % span)
-            lines.append("    # %d folder(s), e.g. %s"
-                         % (len(group), group[0].show.rel))
-            if suggestions:
-                lines.append("    # fuzzy matches against the existing config: %s"
-                             % ", ".join(suggestions))
-            lines.append("")
-
-    (out_dir / "phase0_bands_stub.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return len(unknown)
+        unknown[key] = unknown.get(key, 0) + 1
+    return sorted(unknown.items())
 
 
 def _write_reports(out_dir: Path, result: ScanResult, analyses: list[ShowAnalysis],
                    stats: dict, cfg: Config, index=None, matches=None,
                    repeats=None, verdicts=None) -> None:
     out_dir = Path(out_dir)
+    unresolved = unresolved_artists(analyses)
+    stats["unresolved_artists"] = len(unresolved)
     write_json(out_dir / "phase0_inventory.json", stats)
-    stats["unresolved_artists"] = write_bands_stub(out_dir, analyses)
 
     write_csv(
         out_dir / "phase0_folders.csv",
@@ -353,40 +315,9 @@ def _write_reports(out_dir: Path, result: ScanResult, analyses: list[ShowAnalysi
         ),
     )
 
-    index = index or {}
     matches = matches or []
     repeats = repeats or []
     verdicts = verdicts or []
-
-    # One row per track that could be identified: the recording's own MD5, its
-    # exact length in samples, and what it is filed as.  This is the durable
-    # artifact - everything below is a reading of it, and a later question we
-    # have not thought of yet can be answered from the CSV without re-walking
-    # the library.
-    write_csv(
-        out_dir / "phase0_audio_identity.csv",
-        ["relative_path", "file", "audio_md5", "samples", "seconds",
-         "bits", "rate", "channels", "bytes"],
-        (
-            [str(show.path.relative_to(show.root)), f.name, f.audio_md5 or "",
-             f.samples if f.samples is not None else "",
-             "%.3f" % f.length if f.length else "",
-             f.bits or "", f.rate or "", f.channels or "", f.size]
-            for show in result.shows for f in show.files
-            if f.audio_md5 or f.samples
-        ),
-    )
-
-    write_csv(
-        out_dir / "phase0_same_audio.csv",
-        ["kind", "folder_a", "folder_b", "shared_tracks", "tracks_a", "tracks_b",
-         "example_file", "note"],
-        (
-            [m.kind, m.left, m.right, m.shared, m.left_total, m.right_total,
-             m.examples[0] if m.examples else "", m.note]
-            for m in matches
-        ),
-    )
 
     if verdicts:
         write_csv(
@@ -471,10 +402,14 @@ def _write_reports(out_dir: Path, result: ScanResult, analyses: list[ShowAnalysi
             rep.line("  %-58s %d files" % (a.show.rel[:58],
                                            sum(1 for f in a.show.files if f.ext == ".shn")))
 
-    if stats.get("unresolved_artists"):
-        rep.heading("Artists not in the config")
-        rep.line("  %d unresolved; a paste-ready block is in phase0_bands_stub.yaml"
-                 % stats["unresolved_artists"])
+    if unresolved:
+        rep.heading("Folders no configured act claims (%d)" % len(unresolved))
+        rep.line("  Add each as an act, or set it aside, with jamp acts - it checks the")
+        rep.line("  abbreviation against every act and token already in use.")
+        for key, count in unresolved[:40]:
+            rep.line("  %-58s %d folder(s)" % (key[:58], count))
+        if len(unresolved) > 40:
+            rep.line("  ... and %d more" % (len(unresolved) - 40))
 
     rep.heading("Audio identity")
     rep.line("  Every FLAC carries an MD5 of its decoded audio, written by the encoder.")
@@ -485,24 +420,7 @@ def _write_reports(out_dir: Path, result: ScanResult, analyses: list[ShowAnalysi
     rep.kv("distinct recordings", stats.get("distinct_recordings", 0))
     rep.kv("folder pairs sharing audio", stats.get("folder_pairs_sharing_audio", 0))
 
-    if matches:
-        rep.heading("Folders holding the same audio (%d)" % len(matches))
-        rep.line("  Reported, never resolved - nothing here is deleted or moved.")
-        for m in matches[:60]:
-            rep.line("  %s" % m.kind)
-            rep.line("      %s" % m.left)
-            rep.line("      %s" % m.right)
-            rep.line("      %s" % m.note)
-        if len(matches) > 60:
-            rep.line("  ... and %d more, all of them in phase0_same_audio.csv"
-                     % (len(matches) - 60))
-
-    if repeats:
-        rep.heading("One folder holding the same audio twice (%d)" % len(repeats))
-        rep.line("  Two filenames, one recording - easy to read as a longer show.")
-        for folder, _h, names in repeats[:25]:
-            rep.line("  %s" % folder)
-            rep.line("      %s" % ", ".join(n[:40] for n in names[:4]))
+    _identity.report_matches(rep, matches, repeats, "phase0_same_audio.csv")
 
     if verdicts:
         bad = [v for v in verdicts

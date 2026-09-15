@@ -15,7 +15,7 @@ except, for converting SHN files, ffmpeg.
    does not change anything in the library.
 
 3. Follow what it prints next: jamp unpack, jamp convert, jamp acts,
-   jamp phase1 --artist "<a folder>".
+   jamp plan --artist "<a folder>".
 
 Every command is a dry run until you add --commit.
 

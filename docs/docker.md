@@ -21,7 +21,7 @@ docker build -t jamp .
 | --- | --- |
 | `/music` | your live music library |
 | `/reports` | a folder **outside** the library, for reports |
-| `/config` | a volume or folder for your settings, overrides, remembered paths, and phase 3's download cache (`/config/cache`) |
+| `/config` | a volume or folder for your settings, overrides, remembered paths, and `lookup`'s download cache (`/config/cache`) |
 
 The tool refuses to put reports inside the library, so `/reports` must not be
 a folder within the one mounted on `/music`.
@@ -51,8 +51,8 @@ jamp doctor
 jamp unpack
 jamp convert
 jamp acts
-jamp phase1 --artist "Grateful Dead"
-jamp phase2 --artist "Grateful Dead" --commit --until-settled
+jamp plan --artist "Grateful Dead"
+jamp apply --artist "Grateful Dead" --commit
 ```
 
 Everything in [the guide](guide.md) applies unchanged.
@@ -86,7 +86,7 @@ services:
 
 ```bash
 docker compose run --rm jamp doctor
-docker compose run --rm jamp phase1 --artist "Phish"
+docker compose run --rm jamp plan --artist "Phish"
 ```
 
 ## Notes
@@ -95,7 +95,7 @@ docker compose run --rm jamp phase1 --artist "Phish"
   where Windows is not; two folders differing only in case are two folders.
 - **`tools/`** scripts are not in the image. They are maintenance scripts for
   a copy of the repository.
-- **Long runs** (`phase0 --verify-audio`, `convert` on a large library) keep
+- **Long runs** (`scan --verify-audio`, `convert` on a large library) keep
   going only while the command does; on a NAS, run them inside `screen`,
   `tmux` or the NAS's own task scheduler rather than an SSH session that may
   close.

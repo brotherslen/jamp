@@ -115,6 +115,38 @@ def user_config_path() -> Path:
     return folder / USER_CONFIG_NAME
 
 
+def unseen_settings(config_found: bool) -> str | None:
+    """Why a run should not go ahead with the settings it can see, or None.
+
+    `jamp init` always leaves a config file in the user folder.  A folder that
+    exists with none in it is not a new user; it is settings this process cannot
+    see - a dry run once ran in such a window, with no ignore_folders and no
+    overrides, and planned fifteen renames nobody wanted.
+    """
+    home = user_dir()
+    if config_found or not home.is_dir():
+        return None
+    try:
+        names = {p.name for p in home.iterdir()}
+    except OSError:
+        names = set()
+    # The cache alone is not settings: with JAMP_HOME set it lives in that
+    # folder, and a container may have made it before anyone ran init.  An
+    # empty folder is suspect, though - it is what a window that cannot see
+    # the files in it shows.
+    if names == {"cache"}:
+        return None
+    return ("your settings folder %s exists, but no %s or %s can be seen in it, "
+            "so ignore_folders and your overrides would not be used.\n"
+            "If your settings are in that folder, this program cannot see them. "
+            "On Windows a packaged app - the Claude desktop app is one - keeps "
+            "its own private copy of AppData, so files written from inside it "
+            "exist only there (under %%LOCALAPPDATA%%\\Packages\\<app>\\LocalCache). "
+            "Keep settings outside AppData and point JAMP_HOME at them.  If the "
+            "folder really is empty, run jamp init to set it up."
+            % (home, USER_CONFIG_NAME, LEGACY_CONFIG_NAME))
+
+
 def user_overrides_path() -> Path:
     return user_dir() / USER_OVERRIDES_NAME
 

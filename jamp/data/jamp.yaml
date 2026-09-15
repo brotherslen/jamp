@@ -675,6 +675,11 @@ official_series:
     band: gd
     patterns: ["winterland 1973"]
     multi_date: true
+  - name: "Pacific Northwest '73-'74"
+    band: gd
+    patterns: ["pacific northwest '73-'74", "pacific northwest 73-74",
+               "pacific northwest '73"]
+    multi_date: true
   - name: "Here Comes Sunshine"
     band: gd
     patterns: ["here comes sunshine"]
