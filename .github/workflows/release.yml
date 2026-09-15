@@ -26,8 +26,8 @@ jobs:
             name: jamp-linux-x64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - run: python -m pip install . pyinstaller
@@ -57,7 +57,7 @@ jobs:
           cp dist/jamp* "${{ matrix.name }}/"
           cp packaging/README-standalone.txt "${{ matrix.name }}/README.txt"
           cp LICENSE THIRD-PARTY-NOTICES.md "${{ matrix.name }}/"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.name }}
           path: ${{ matrix.name }}
@@ -69,10 +69,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
       - name: zip each build
         run: for d in jamp-*; do (cd "$d" && zip -r "../$d.zip" .); done
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: jamp-*.zip
           # v0.2.0-beta1 and the like are pre-releases.
