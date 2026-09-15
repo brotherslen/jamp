@@ -42,13 +42,24 @@ jobs:
           E="$PWD/dist/jamp"
           cd "$RUNNER_TEMP"
           export JAMP_HOME="$RUNNER_TEMP/home"
-          mkdir -p "lib/Grateful Dead/gd1977-05-08.sbd.miller.flac16" reports
+          SHOW="lib/Grateful Dead/gd1977-05-08.sbd.miller.flac16"
+          mkdir -p "$SHOW" reports
+          # Real audio, so the plan has a rename to make and the commit below
+          # does something: beta2's downloads refused every commit, and an
+          # empty show folder never reached one.
+          python -c "import wave,sys; w=wave.open(sys.argv[1],'wb'); w.setnchannels(2); w.setsampwidth(2); w.setframerate(44100); w.writeframes(bytes(44100*4)); w.close()" "$SHOW/01 Bertha.wav"
           "$E" --version
           "$E" init --root "$RUNNER_TEMP/lib" --out-dir "$RUNNER_TEMP/reports"
           "$E" acts | tee acts.txt
           grep -q "Grateful Dead (gd)" acts.txt
           "$E" unpack
-          "$E" plan
+          "$E" plan | tee plan.txt
+          grep -q "PLAN 1" plan.txt
+          "$E" apply --commit | tee apply.txt
+          grep -q "COMMITTED: 1 folders" apply.txt
+          grep -q "SETTLED" apply.txt
+          test ! -d "$SHOW"
+          test -f "lib/Grateful Dead/gd1977-05-08.sbd.miller/.etree_state.json"
           "$E" doctor
       - name: package
         shell: bash

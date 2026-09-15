@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 # "jamp" itself is taken on PyPI by an unrelated project; the command and the
 # package are still jamp.
 name = "jamp-archive"
-version = "0.2.0b3"
+version = "0.2.0b4"
 description = "JAMP: an asset management pipeline for the live music archive"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]

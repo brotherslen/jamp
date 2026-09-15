@@ -555,7 +555,22 @@ same rename again. If you want the folder left as it is for good, add it to
 
 **"--commit refused: ..."** - run the `plan` command it prints, read the
 plan, then commit. The dry run and the commit need the same reports folder, the
-same `--artist` flags, and the same `--reclassify` and `--unnest`.
+same `--artist` flags, the same `--reclassify` and `--unnest`, and the same
+settings: editing `jamp.yaml`, `acts.yaml` or `overrides.yaml` after the dry run
+means running it again.
+
+**"NOT committed: their plan is no longer what the dry run showed".** Those
+folders changed on disk after the dry run, or would now be planned differently.
+They were left exactly as they were and are listed in `phase2_summary.txt`; the
+rest of the commit went ahead. Run `plan` again and read what it says about them.
+
+**"your settings folder ... exists, but no jamp.yaml or etree.yaml can be seen
+in it".** The run stopped before reading anything, because without your settings
+it would ignore your `ignore_folders` and overrides. If the folder is really
+empty, run `jamp init`. If your settings are there, this program cannot see
+them: on Windows a packaged app keeps its own private copy of AppData, so files
+written from inside one exist only there. Keep your settings in a folder outside
+AppData and point `JAMP_HOME` at it.
 
 **"Access is denied" and a folder rolled back (Windows).** Antivirus and Windows
 Search open files the moment they change. The tool retries briefly; if it keeps
@@ -588,5 +603,9 @@ fewer requests. `lookup` already waits and retries when a site asks it to; after
 several failures in a row it leaves that site alone for the rest of the run.
 Run `lookup` again later: everything already fetched is cached.
 
-**The reports from an earlier run disappeared.** Each run replaces the reports
-in its folder. Use a new `--out-dir` for anything you want to keep.
+**Where did an earlier run's reports go?** Into `history/` inside the reports
+folder, in a subfolder named for when the later run started and which command
+it was. The newest reports are always at the top of the folder. Nothing in jamp
+reads `history/` - a whole-library `plan` adds about 16 MB to it each time - so
+delete old subfolders whenever you like, keeping any `phase2_committed.csv` you
+may want for `jamp restore --log`.

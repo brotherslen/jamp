@@ -159,6 +159,10 @@ def save_acts(path: Path, data: dict) -> None:
     body = yaml.safe_dump(data, sort_keys=False, allow_unicode=True,
                           default_flow_style=False)
     path.write_text(ACTS_HEADER + "\n" + body, encoding="utf-8")
+    if path.parent.resolve() == userdir.user_dir().resolve():
+        # A user folder jamp has written always holds a config, as after init;
+        # acts.yaml alone looks like settings this window cannot see.
+        userdir.ensure_config()
 
 
 def add_act(data: dict, folder: str, name: str, abbrev: str) -> dict:
@@ -216,6 +220,12 @@ def run(args) -> int:
     acts_path = userdir.user_dir() / userdir.ACTS_NAME
     data = load_acts(acts_path)
     cfg = load_config()
+    # Before acts.yaml is written: afterwards a user folder this window cannot
+    # see would look like one it had set up itself.
+    problem = userdir.unseen_settings(cfg.user_path is not None)
+    if problem:
+        print("acts refused: %s" % problem, file=sys.stderr)
+        return 2
 
     # Scripted answers first: the way a container or a script sets things up.
     for folder in args.ignore or ():

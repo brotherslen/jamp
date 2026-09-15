@@ -255,6 +255,46 @@ def test_a_settings_folder_with_no_config_to_be_seen_stops_the_run(
     assert not (tmp_path / "r" / "phase1_plan.json").exists()
 
 
+def test_remember_before_init_leaves_a_config_and_later_runs_go_ahead(
+        library, tmp_path, home, capsys):
+    """plan --remember is what the CLI suggests; it used to leave only
+    paths.json, and every run after it was refused as unseen settings."""
+    out = tmp_path / "r"
+    assert cli.main(["plan", str(library), "--out-dir", str(out), "--remember"]) == 0
+    assert (home / "jamp.yaml").exists() and (home / "paths.json").exists()
+    assert cli.main(["plan"]) == 0
+    assert "refused" not in capsys.readouterr().err
+
+
+def test_remember_never_writes_into_a_folder_it_cannot_see(library, tmp_path, home, capsys):
+    home.mkdir(parents=True)
+    out = tmp_path / "r"
+    assert cli.main(["plan", str(library), "--out-dir", str(out), "--remember"]) == 2
+    assert "cannot see them" in capsys.readouterr().err
+    assert list(home.iterdir()) == []
+
+
+def test_remember_does_not_shadow_an_etree_yaml(library, tmp_path, home):
+    home.mkdir(parents=True)
+    (home / "etree.yaml").write_text("{}\n", encoding="utf-8")
+    assert cli.main(["plan", str(library), "--out-dir", str(tmp_path / "r"),
+                     "--remember"]) == 0
+    assert not (home / "jamp.yaml").exists()
+
+
+def test_acts_before_init_leaves_a_config_and_plan_goes_ahead(library, tmp_path, home):
+    assert cli.main(["acts", str(library), "--ignore", "Studio"]) == 0
+    assert (home / "acts.yaml").exists() and (home / "jamp.yaml").exists()
+    assert cli.main(["plan", str(library), "--out-dir", str(tmp_path / "r")]) == 0
+
+
+def test_acts_refuses_a_folder_it_cannot_see(library, tmp_path, home, capsys):
+    home.mkdir(parents=True)
+    assert cli.main(["acts", str(library), "--ignore", "Studio"]) == 2
+    assert "cannot see them" in capsys.readouterr().err
+    assert list(home.iterdir()) == []
+
+
 def test_a_folder_holding_only_the_cache_is_a_new_user(library, tmp_path, home):
     (home / "cache").mkdir(parents=True)
     assert cli.main(["phase1", str(library), "--out-dir", str(tmp_path / "r")]) == 0

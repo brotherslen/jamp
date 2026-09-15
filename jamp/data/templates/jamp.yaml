@@ -16,8 +16,9 @@ settings:
   ignore_folders: []
 
 # Acts the shipped list does not have.  The abbreviation becomes the prefix of
-# every folder name for that act, so choose it with care.  Phase 0 writes a
-# phase0_bands_stub.yaml with a guess for every act it could not place.
+# every folder name for that act, so choose it with care.  `jamp acts` lists
+# every folder it cannot place and adds acts to acts.yaml, checking each
+# abbreviation against the ones already in use.
 #
 # bands:
 #   - abbrev: bs

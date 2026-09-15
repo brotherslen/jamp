@@ -20,14 +20,16 @@ SHN to FLAC, proving each conversion lossless.
 ## What it promises
 
 - **Nothing is written without `--commit`**, and a commit is refused until
-  there is a dry run of the same thing to read.
+  there is a dry run of the same thing to read. It then does what that dry run
+  showed: a folder that changed since is left alone and listed.
 - **No file is ever deleted.** ZIPs and SHN files are replaced only by copies
   proven identical, and the originals are set aside, not removed. `jamp tidy`
   removes folders with nothing at all in them, and only those.
 - **A date or an act is never guessed.** A folder it is not sure about is
   listed with the reason and left exactly as it is.
 - **Every tag is backed up before it changes**, every change is logged, and
-  `jamp restore` puts a committed folder back.
+  `jamp restore` puts a committed folder back. No run's reports are overwritten
+  by the next.
 - **Running it twice changes nothing.**
 
 ## Quick start
@@ -66,7 +68,7 @@ jamp apply --artist "Grateful Dead" --commit
 
 ## Status
 
-**Beta** (0.2.0b3). Built on and used for one large collection on Windows, where it has renamed and
+**Beta** (0.2.0b4). Built on and used for one large collection on Windows, where it has renamed and
 retagged over 800 shows across thirteen acts. Its tests run on Windows, macOS
 and Linux on every change, but day-to-day use so far has been on Windows. Back
 up a library before its first commit.

@@ -28,7 +28,7 @@ body:
     attributes:
       label: Version
       description: The output of `jamp --version`.
-      placeholder: jamp 0.2.0b3
+      placeholder: jamp 0.2.0b4
     validations:
       required: true
   - type: textarea

@@ -471,6 +471,12 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as exc:
         print("config error: %s" % exc, file=sys.stderr)
         return 2
+    # Before --remember writes anything there: afterwards a user folder this
+    # window cannot see would look like one it had just set up.
+    problem = _settings_problem(cfg)
+    if problem:
+        print("refused: %s" % problem, file=sys.stderr)
+        return 2
 
     # An explicit argument always wins; a remembered path fills a blank.
     remembered = load_settings()
@@ -482,6 +488,15 @@ def main(argv: list[str] | None = None) -> int:
                                for n in ("root", "out_dir", "cache", "shows",
                                          "phishnet_key")})
         print("  remembered these paths in %s" % saved)
+        # A user folder jamp has written always holds a config, as after init.
+        created = userdir.ensure_config()
+        if created:
+            print("  created  %s" % created)
+            try:
+                cfg = load_config(args.config)
+            except ConfigError as exc:
+                print("config error: %s" % exc, file=sys.stderr)
+                return 2
 
     if args.root is None or args.out_dir is None:
         print("ROOT and --out-dir are required. Give them once with "
@@ -525,10 +540,6 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if len(overrides):
         print("  overrides: %d folder(s) from %s" % (len(overrides), overrides_path))
-    problem = _settings_problem(cfg)
-    if problem:
-        print("refused: %s" % problem, file=sys.stderr)
-        return 2
     settings = _settings_record(cfg, overrides_path)
 
     artists = set(args.artist) if args.artist else None

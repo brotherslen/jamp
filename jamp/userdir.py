@@ -115,13 +115,37 @@ def user_config_path() -> Path:
     return folder / USER_CONFIG_NAME
 
 
+def ensure_config() -> Path | None:
+    """Leave the starter config in the user folder, as `jamp init` does.
+
+    Called by everything else that writes there (--remember, `jamp acts`), so
+    that a user folder jamp has written always holds a config - which is what
+    unseen_settings relies on.  Without it `plan --remember` before `init` left
+    only paths.json, and every run after it was refused as settings that could
+    not be seen.  Never beside etree.yaml, which a jamp.yaml would shadow.
+    Returns the file created, or None.
+    """
+    import shutil
+
+    if user_config_path().exists():
+        return None
+    target = user_dir() / USER_CONFIG_NAME
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(SHIPPED_DIR / "templates" / USER_CONFIG_NAME, target)
+    return target
+
+
 def unseen_settings(config_found: bool) -> str | None:
     """Why a run should not go ahead with the settings it can see, or None.
+
+    Run it before writing anything to the user folder: afterwards a folder this
+    process cannot see would look like one it had set up itself.
 
     `jamp init` always leaves a config file in the user folder.  A folder that
     exists with none in it is not a new user; it is settings this process cannot
     see - a dry run once ran in such a window, with no ignore_folders and no
-    overrides, and planned fifteen renames nobody wanted.
+    overrides, and planned fifteen renames nobody wanted.  (Everything else
+    that writes there leaves one too - see ensure_config.)
     """
     home = user_dir()
     if config_found or not home.is_dir():

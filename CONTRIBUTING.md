@@ -101,9 +101,10 @@ bug that broke it.
 | `dupes.py` | lossy copies beside lossless ones |
 | `integrity.py`, `identity.py` | FLAC STREAMINFO, decoding against the MD5, finding ffmpeg, which folders share audio |
 | `phase0.py`, `phase1.py`, `phase2.py` | `scan`, `plan` and `apply`: the inventory, the plan, the writer. The modules keep the phase names |
+| `reads.py` | each audio file's read saved with its size and modification time, reused while both match; the per-folder fingerprint a commit is checked against |
 | `tagwriter.py` | writing tags, and backing up and restoring them per container |
 | `state.py` | `.etree_state.json` |
-| `report.py` | CSV/JSON/text reports and the run lock |
+| `report.py` | CSV/JSON/text reports, the run lock, and moving a replaced report into `history/` |
 | `winpath.py`, `textio.py` | long Windows paths; encoding-tolerant text reading |
 | `confirm.py` | `lookup` (phase 3) |
 | `archiveorg.py`, `phishin.py`, `phishnet.py`, `jerrybase.py`, `mmjarchive.py` | one reference source each |
