@@ -34,6 +34,9 @@ SHN to FLAC, proving each conversion lossless.
 
 ## Quick start
 
+**New to the command line?** Follow **[Start here](docs/start-here.md)** instead:
+the same steps, one at a time, with nothing assumed.
+
 Download the standalone build for Windows, macOS (Apple Silicon or Intel) or
 Linux from [Releases](https://github.com/brotherslen/jamp/releases), or with
 Python 3.11 or newer run `pip install .` in a copy of this repository, or use
@@ -56,6 +59,8 @@ jamp apply --artist "Grateful Dead" --commit
 
 ## Documentation
 
+- **[Start here](docs/start-here.md)** - step by step for anyone who has not
+  used a command-line program: download, set up, preview, commit, undo.
 - **[The guide](docs/guide.md)** - setting up, reading a plan, committing,
   overrides, filling gaps from the internet, undoing with `jamp restore`,
   troubleshooting.

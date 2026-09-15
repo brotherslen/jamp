@@ -67,7 +67,10 @@ Three ways, all giving the same `jamp` command:
 
 - **The standalone download** - one program for Windows, macOS or Linux, with
   nothing else to install. Unzip it, open a terminal in that folder, and run
-  `jamp init` (`.\jamp init` on Windows, `./jamp init` elsewhere).
+  `jamp init` (`.\jamp init` on Windows, `./jamp init` elsewhere). Every
+  command in this guide needs that same `.\` or `./` when run from the
+  download's folder - `.\jamp plan`, `./jamp apply` - since a terminal does not
+  look in the current folder for programs.
 - **With Python** 3.11 or newer, inside a copy of the code: `pip install .`,
   then `jamp init`.
 - **With Docker**, for a library on a NAS: see [docker.md](docker.md).

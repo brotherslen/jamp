@@ -15,7 +15,8 @@ except, for converting SHN files, ffmpeg.
    does not change anything in the library.
 
 3. Follow what it prints next: jamp unpack, jamp convert, jamp acts,
-   jamp plan --artist "<a folder>".
+   jamp plan --artist "<a folder>".  Write every one of them the same way as
+   in step 2 - .\jamp acts on Windows, ./jamp acts on macOS and Linux.
 
 Every command is a dry run until you add --commit.
 
@@ -26,5 +27,8 @@ check, and not included. Get it from https://ffmpeg.org/download.html
   Linux:   your package manager, e.g. sudo apt install ffmpeg
 or put an ffmpeg program in this same folder. `jamp doctor` says whether it is
 found.
+
+Never used a terminal? Step by step, with nothing assumed:
+  https://github.com/brotherslen/jamp/blob/main/docs/start-here.md
 
 The full guide: https://github.com/brotherslen/jamp/blob/main/docs/guide.md
