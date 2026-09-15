@@ -61,6 +61,8 @@ jamp apply --artist "Grateful Dead" --commit
 
 - **[Start here](docs/start-here.md)** - step by step for anyone who has not
   used a command-line program: download, set up, preview, commit, undo.
+- **[For your AI assistant](docs/ai-assistant.md)** - upload it to ChatGPT,
+  Claude or similar before asking for help, so it does not guess.
 - **[The guide](docs/guide.md)** - setting up, reading a plan, committing,
   overrides, filling gaps from the internet, undoing with `jamp restore`,
   troubleshooting.

@@ -14,6 +14,10 @@ becomes this:
 
     gd1977-05-08.sbd.miller.flac16 - Barton Hall, Ithaca, NY/gd1977-05-08d1t01.flac
 
+**Using ChatGPT or another AI assistant to help?** Upload
+[ai-assistant.md](ai-assistant.md) into the chat first (or paste all of it).
+JAMP is new, so assistants do not know it and will otherwise guess.
+
 **The one thing to remember:** JAMP never changes anything until you type
 `--commit` at the end of a command. Everything before that is a preview.
 
