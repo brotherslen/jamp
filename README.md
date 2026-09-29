@@ -4,6 +4,8 @@ An asset management pipeline for the live music archive.
 
 Do you collect live music recordings? Do you get frustrated by how quickly they can lead to an unorganized mess? The various naming conventions of folders and files, contents of song tags, if it's official/audience, soundboard AUD or Matrix or mp3, flac or shn? Enter JAMP. Jamp will work with you to greatly expedite the following actions on your existing live show archive. Unzipping and un-nesting any straggling downloads, audio file checking/verification, applying a standardized folder and file naming convention, filling in missing file tags via information from your favorite show archive and more!   
 
+Developed with assistance from Claude code.
+
 JAMP puts a collection of live recordings in order - folder names, track
 names, tags and checksum files - without destroying anything.
 
