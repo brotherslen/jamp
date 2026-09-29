@@ -4,7 +4,6 @@ An asset management pipeline for a lossless and lossy live music archive.
 
 Do you collect live music recordings? Do you get frustrated by how quickly they can lead to an unorganized mess that doesn't integrate properly with your player software? Enter JAMP. Jamp will work with you to quickly apply many useful functions across your entire existing live show archive, with the final output being a wonderfully consistent, complete and organized music collection. All existing information is automatically backed up before being worked on, and the script cannot delete anything without explicit permission from the user. 
 
-**Before/After**
     Grateful Dead 5-8-77 Cornell SBD (Miller)/01 - New Minglewood Blues.flac
     ->
     gd1977-05-08.sbd.miller.flac16 - Barton Hall, Ithaca, NY/gd1977-05-08d1t01.flac
