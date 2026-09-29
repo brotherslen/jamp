@@ -2,13 +2,9 @@
 
 An asset management pipeline for a lossless and lossy live music archive. 
 
-Do you collect live music recordings? Do you get frustrated by how quickly they can lead to an unorganized mess? The various naming conventions of folders and files, contents of song tags, if it's official/audience, soundboard AUD or Matrix or mp3, flac or shn? No more forgetting you were only able to grab the show in shn! Enter JAMP. Jamp will work with you to greatly expedite the following actions to your existing live show archive. Unzipping and un-nesting any straggling downloads, audio file checking/verification, applying a standardized folder and file naming convention, filling in missing file tags via information from your favorite show archive and more! 
+Do you collect live music recordings? Do you get frustrated by how quickly they can lead to an unorganized mess that doesn't integrate properly with your player software? Enter JAMP. Jamp will work with you to quickly apply many useful functions across your entire existing live show archive, with the final output being a wonderfully consistent, complete and organized music collection. All existing information is automatically backed up before being worked on, and the script cannot delete anything without explicit permission from the user. 
 
-Developed with assistance from Claude code.
-
-JAMP puts a collection of live recordings in order - folder names, track
-names, tags and checksum files - without destroying anything.
-
+**Before/After**
     Grateful Dead 5-8-77 Cornell SBD (Miller)/01 - New Minglewood Blues.flac
     ->
     gd1977-05-08.sbd.miller.flac16 - Barton Hall, Ithaca, NY/gd1977-05-08d1t01.flac
@@ -20,6 +16,8 @@ official releases, leaves releases their own names, and can fill missing venues
 and song titles from archive.org, phish.in, phish.net, jerrybase and the My
 Morning Jacket archive. It also extracts shows still in ZIP files and converts
 SHN to FLAC, proving each conversion lossless.
+
+Developed with assistance from Claude code.
 
 ## What it promises
 
